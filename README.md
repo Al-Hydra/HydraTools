@@ -14,7 +14,7 @@ Remove LOD meshes.\
 
 # Installation
 
-Get the addon from [Releases](https://github.com/superuser590/HydraTools/releases)\
+Get the addon from [Releases](https://github.com/superuser590/HydraTools/releases)
 
 In Blender Open the `Edit` -> `Preferences` window from the menu bar, go to `Add-ons`, click on the `Install` button,\
 and select the release zip you downloaded. Then, enable the script by checking the box next to it.
