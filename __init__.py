@@ -16,7 +16,7 @@ bl_info = {
     "author" : "HydraBladeZ, Dei",
     "description" : "",
     "blender" : (3, 0, 0),
-    "version" : (1, 0, 0),
+    "version" : (1, 1, 0),
     "location" : "View3D",
     "warning" : "",
     "category" : "Object"
@@ -25,10 +25,14 @@ bl_info = {
 import bpy
 from . Panel import (Panel, ColProperty)
 from . Operators import (RemoveLOD, AddVertColors, RemoveVertColors,
-    PaintVertexColors, ApplyRestPose, RemoveCharCode, RenameBones, AddCharCode)
+    PaintVertexColors, ApplyRestPose, RemoveCharCode, RenameBones, AddCharCode,
+    Connect_Bones, Fix_names, Armature_modifier, GetTexturePath,
+    ApplyTextures, UnlinkTextures, Swap_Character_Code)
 
 classes = (Panel, RemoveLOD, ColProperty, AddVertColors, RemoveVertColors,
-    PaintVertexColors, ApplyRestPose, RemoveCharCode, RenameBones, AddCharCode)
+    PaintVertexColors, ApplyRestPose, RemoveCharCode, RenameBones, AddCharCode,
+    Connect_Bones, Fix_names, Armature_modifier, GetTexturePath,
+    ApplyTextures, UnlinkTextures, Swap_Character_Code)
     
 def register():
     for c in classes:
