@@ -7,8 +7,12 @@ class Panel(Panel):
     bl_space_type = "VIEW_3D"
     bl_idname = "HYDRA_PT_Panel"
     bl_region_type = "UI"
-    bl_label = "Hydra Tools"
-    bl_category = "Hydra Tools"
+    bl_label = "HydraTools"
+    bl_category = "HydraTools"
+
+    @classmethod
+    def poll(cls, context):
+        return len(bpy.data.collections) > 0
 
     def draw(self, context):
         layout = self.layout
@@ -41,8 +45,18 @@ class Panel(Panel):
         
         row = layout.row()
         row.operator("object.applypose")
-        
 
+        row = layout.row()
+        label = layout.label(text = 'XFBIN Materials and Material IDs:')
+        layout.prop(colprop, 'Old_Material_ID')
+        layout.prop(colprop, 'New_Material_ID')
+        layout.operator("object.replace_mats")
+        layout.operator("object.duplicate_mats")
+
+        label = layout.label(text = 'Posing and Animation ONLY:')
+        row = layout.row()
+        row.operator("object.ik")
+        
         label = layout.label(text = 'EXPERIMENTAL')
         row = layout.row()
         layout.prop(colprop, 'target_armature')
@@ -56,8 +70,6 @@ class Panel(Panel):
         row.operator("object.swap_code")
         '''row = layout.row()
         row.operator("object.opaque")'''
-        row = layout.row()
-        row.operator("object.connectbones")
         row = layout.row()
         row.operator("object.fix_names")
         row = layout.row()
@@ -143,13 +155,27 @@ class ColProperty(bpy.types.PropertyGroup):
     CharacterCode: StringProperty(
     name= 'Object Code',
     default= 'code',
-    description= "This code will be used in Meshes, Bones and Collection name"
+    description= "This is the character code, it can either 4 character (2nrt) or 6 characters long(1dio01), FOR CODES THAT END WITH 01 FOR EXAMPLE, THE MODEL ID MUST ONLY BE (t0) and not 00t0"
     )
 
     ModelID: StringProperty(
     name= 'Model ID',
     default= 'xxtx',
     maxlen= 4,
-    description= "This "
+    description= "00t0 for Naruto models and t0 for Jojo "
+    )
+
+    Old_Material_ID: StringProperty(
+    name = 'Old Material ID',
+    default = '00 00 00 00',
+    maxlen= 11,
+    description = "You put the material ID you want to replace here. EXAMPLE: (00 00 F0 0A)"
+    )
+
+    New_Material_ID: StringProperty(
+    name = 'New Material ID',
+    default = '00 00 00 00',
+    maxlen= 11,
+    description = "You put the new material ID here. EXAMPLE: (00 02 00 01)",
     )
     

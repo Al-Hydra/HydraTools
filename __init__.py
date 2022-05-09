@@ -15,7 +15,7 @@ bl_info = {
     "name" : "Hydra Tools",
     "author" : "HydraBladeZ, Dei",
     "description" : "",
-    "blender" : (3, 0, 0),
+    "blender" : (3, 1, 0),
     "version" : (1, 1, 0),
     "location" : "View3D",
     "warning" : "",
@@ -26,13 +26,13 @@ import bpy
 from . Panel import (Panel, ColProperty)
 from . Operators import (RemoveLOD, AddVertColors, RemoveVertColors,
     PaintVertexColors, ApplyRestPose, RemoveCharCode, RenameBones, AddCharCode,
-    Connect_Bones, Fix_names, Armature_modifier, GetTexturePath,
-    ApplyTextures, UnlinkTextures, Swap_Character_Code)
+    StormIK, FixNames, ArmatureModifier, GetTexturePath, ApplyTextures,
+    UnlinkTextures, Swap_Character_Code, Replace_Mats, Duplicate_XFBIN_Mat)
 
 classes = (Panel, RemoveLOD, ColProperty, AddVertColors, RemoveVertColors,
     PaintVertexColors, ApplyRestPose, RemoveCharCode, RenameBones, AddCharCode,
-    Connect_Bones, Fix_names, Armature_modifier, GetTexturePath,
-    ApplyTextures, UnlinkTextures, Swap_Character_Code)
+    StormIK, FixNames, ArmatureModifier, GetTexturePath, ApplyTextures,
+    UnlinkTextures, Swap_Character_Code, Replace_Mats, Duplicate_XFBIN_Mat)
     
 def register():
     for c in classes:
