@@ -6,7 +6,6 @@ from rna_prop_ui import PropertyPanel
 from os import listdir
 from os.path import isfile, join
 
-
 class RemoveLOD(bpy.types.Operator):
     bl_idname = "object.remove_lod"
     bl_label = "Remove LOD"
@@ -25,18 +24,14 @@ class RemoveLOD(bpy.types.Operator):
         collection = bpy.data.collections[colprop.collections]
         armature_obj = bpy.data.objects[colprop.armatures]
         clumpdata = armature_obj.xfbin_clump_data
-
-        bpy.ops.object.select_all(action='DESELECT')
             
         lod = {"_lod1", "_lod2", "lod01", "_LOD1", "_LOD2",
         "_shadow", "_blur0 shadow", "_blur0 shadow01"}
 
         #delete any mesh that contains any of the strings in the list above
         for obj in collection.all_objects:
-            obj.hide_set(False) 
             if any(x in obj.name for x in lod):
-                obj.select_set(True)
-        bpy.ops.object.delete(use_global=True, confirm=True)
+                bpy.data.objects.remove(obj)
             
         #set LOD levels to 1
         armature_obj.xfbin_clump_data.coord_flag0 = 1
@@ -71,18 +66,11 @@ class AddVertColors(Operator):
         
         collections = bpy.data.collections
         colprop = bpy.context.scene.col_prop
-        bpy.ops.object.select_all(action='DESELECT')
         for obj in collections[colprop.collections].all_objects:
-            obj.hide_set(False)
-            obj.select_set(True)
-    
-        for i, obj in enumerate(bpy.context.selected_objects):
-            if (obj.type == 'MESH'):
-                if (len(obj.data.vertex_colors) == 0):
-                    obj.data.vertex_colors.new()
-                else:
-                    self.report({'INFO'}, f'{obj.name} Has at least 1 vertex colors layer')
-        bpy.ops.object.select_all(action='DESELECT')
+            if obj.type == 'MESH' and len(obj.data.vertex_colors) == 0:
+                    obj.data.vertex_colors.new('Colors')
+            else:
+                self.report({'INFO'}, f'{obj.name} Has at least 1 vertex colors layer')
         return {'FINISHED'}
 
 class RemoveVertColors(Operator):
@@ -102,17 +90,11 @@ class RemoveVertColors(Operator):
         
         collections = bpy.data.collections
         colprop = bpy.context.scene.col_prop
-        bpy.ops.object.select_all(action='DESELECT')
         for obj in collections[colprop.collections].all_objects:
             if (obj.type == 'MESH'):
-                obj.hide_set(False)
-                obj.select_set(True)
-    
-        for obj in bpy.context.selected_objects:
-                while obj.data.vertex_colors:
-                    obj.data.vertex_colors.remove(obj.data.vertex_colors[0])
-                self.report({'INFO'}, f'Vertex Colors layers in {obj.name} are removed')
-        bpy.ops.object.select_all(action='DESELECT')
+                for vc in obj.data.vertex_colors:
+                    obj.data.vertex_colors.remove(vc)  
+                    self.report({'INFO'}, f'Vertex Colors layers in {obj.name} are removed')
         return {'FINISHED'}
 
 class PaintVertexColors(Operator):
@@ -136,19 +118,14 @@ class PaintVertexColors(Operator):
         bpy.ops.object.select_all(action='DESELECT')
         
         for obj in collections[colprop.collections].all_objects:
-            if (obj.type == 'MESH'):
-                obj.hide_set(False)
-                obj.select_set(True)
-                
-        for i, obj in enumerate(bpy.context.selected_objects):
-            bpy.context.view_layer.objects.active = obj
-            bpy.ops.paint.vertex_paint_toggle()
-            bpy.context.scene.col_prop.VertColorPick
-            bpy.data.brushes["Draw"].color = bpy.context.scene.col_prop.VertColorPick
-            bpy.ops.paint.vertex_color_set()
-            bpy.ops.paint.vertex_paint_toggle()
+            if (obj.type == 'MESH') and obj.data.vertex_colors[0]:
+                for vc in obj.data.vertex_colors[0].data:
+                    color = colprop.VertColorPick
+                    vc.color[0] = color[0]
+                    vc.color[1] = color[1]
+                    vc.color[2] = color[2]
+                    vc.color[3] = 1
             
-        bpy.ops.object.select_all(action='DESELECT')
         return {'FINISHED'}        
 
 
@@ -171,26 +148,15 @@ class ApplyRestPose(Operator):
         colprop = bpy.context.scene.col_prop
         selected = bpy.context.selected_objects
         a_object = bpy.data.objects[colprop.armatures]
-        
-        bpy.ops.object.select_all(action='DESELECT')
-        
-        for obj in collections[colprop.collections].all_objects:
-            if (obj.type == 'MESH'):
-                obj.hide_set(False)
-                obj.select_set(True)
-                
-        for i, obj in enumerate(bpy.context.selected_objects):
-            mod = obj.modifiers.new(type='ARMATURE', name='ArmatureToApply')
-            mod.object = bpy.data.objects[colprop.armatures]
-            #bpy.ops.object.select_all(action='DESELECT')
-
-        for obj in bpy.context.selected_objects:
-            bpy.context.view_layer.objects.active = obj
-            for mod in [m for m in obj.modifiers if m.type == 'ARMATURE']:
+                        
+        for obj in bpy.data.objects[colprop.armatures].children_recursive:
+            if obj.type == 'MESH':
+                mod = obj.modifiers.new(type='ARMATURE', name='ArmatureToApply')
+                mod.object = bpy.data.objects[colprop.armatures]
+                context.view_layer.objects.active = obj
                 bpy.ops.object.modifier_apply( modifier = "ArmatureToApply" )
-                bpy.ops.object.select_all(action='DESELECT')
-                
-        bpy.context.scene.objects[colprop.armatures].select_set(True)
+
+        bpy.ops.object.select_all(action='DESELECT')
         bpy.context.view_layer.objects.active = bpy.data.objects[colprop.armatures]
         bpy.ops.object.posemode_toggle()
         bpy.ops.pose.armature_apply(selected=False)
@@ -218,7 +184,6 @@ class RemoveCharCode(Operator):
         a_object = bpy.data.objects[colprop.armatures]
         armature = bpy.data.armatures[colprop.armatures]
         ab = bpy.data.objects[colprop.armatures].data.bones
-        clumpdata = a_object.xfbin_clump_data
         char_id = a_object.data.bones[1].name
         nl = len(armature.bones[1].name)
         nc = len(armature.bones[1].name[:-4])
@@ -236,20 +201,12 @@ class RemoveCharCode(Operator):
             elif bone.name[0:nl] == char_id and len(bone.name) > nl and bone.name:
                 bone.name = bone.name[nl+1:]
                 self.report({'INFO'}, f'ID:{char_id} Removed from {bone.name}')
-        
-        bpy.ops.object.select_all(action='DESELECT')
-        
-        #re-sets armatures modifier object to fix a bug in blender 3.0
-        for c in bpy.data.objects[colprop.armatures].children:
-            for child in c.children:
-                if child.type == 'MESH':
-                    child.hide_set(False)
-                    child.select_set(True)
-        for i, obj in enumerate(bpy.context.selected_objects):
-            for mod in [m for m in obj.modifiers if m.type == 'ARMATURE']:
-                mod.object = bpy.data.objects[colprop.armatures]
                 
-        bpy.ops.object.select_all(action='DESELECT')
+        #re-sets armatures modifier object to fix a bug in blender 3.0
+        '''for obj in bpy.data.objects[colprop.armatures].children_recursive:
+            if obj.type == 'MESH':
+                mod = [m for m in obj.modifiers if m.type == 'ARMATURE']
+                mod[0].object = bpy.data.objects[colprop.armatures]'''
 
         return {'FINISHED'}
     
@@ -323,21 +280,13 @@ class AddCharCode(Operator):
             elif bone.name[0:nl] != char_id and bone.name:
                 self.report({'INFO'}, f"ID:({char_id}) added to ({bone.name})")
                 bone.name = char_id + ' ' + bone.name
-        
-        bpy.ops.object.select_all(action='DESELECT')
-        
+                
         #re-sets armatures modifier object to fix a bug in blender 3.0
-        for c in bpy.data.objects[colprop.armatures].children:
-            for child in c.children:
-                if child.type == 'MESH':
-                    child.hide_set(False)
-                    child.select_set(True)
-                    
-        for i, obj in enumerate(bpy.context.selected_objects):
-            for mod in [m for m in obj.modifiers if m.type == 'ARMATURE']:
-                mod.object = bpy.data.objects[colprop.armatures]
+        '''for obj in bpy.data.objects[colprop.armatures].children_recursive:
+            if obj.type == 'MESH':
+                mod = [m for m in obj.modifiers if m.type == 'ARMATURE']
+                mod[0].object = bpy.data.objects[colprop.armatures]'''
         
-        bpy.ops.object.select_all(action='DESELECT')
         return {'FINISHED'}
 
 class Blend_Mode_Opaque(Operator):
@@ -905,8 +854,8 @@ class StormIK(Operator):
 
 class FixNames(Operator):
     bl_idname = "object.fix_names"
-    bl_label = "Fix names and delete orphans"
-    bl_description = ("This will fix names and stuff + delete useless shit")
+    bl_label = "Remove (.00x) from object names"
+    bl_description = ("Self explanatory")
     
     @classmethod
     def poll(cls, context):
@@ -932,20 +881,16 @@ class FixNames(Operator):
         for m in bpy.data.meshes:
             if m.users == 0:
                 bpy.data.meshes.remove(m)
-        #fix armature name and remove unused names in BlendData
+        #fix armature name
         for a in collection.all_objects:
-            b = []
             if a.type == 'ARMATURE':
-                b.append(a)
-            for c in b:
-                c.data.name = c.name
+                a.data.name = a.name
+
+        #remove unused names in BlendData
         for a in armature:
             if a.name[-4:-2] == '.0' and a.users == 0:
-                print(a)
                 armature.remove(a)
-            '''for m in bpy.data.materials:
-            if m.name.startswith('[XFBIN]') and m.name[-4:-2] == '.0':
-                print(m)'''
+
         return {'FINISHED'}
 
 class ArmatureModifier(Operator):
@@ -962,28 +907,16 @@ class ArmatureModifier(Operator):
         
     def execute(self, context):
         colprop = bpy.context.scene.col_prop
-        cobj = []
 
-        for obj in bpy.data.objects[colprop.armatures].children:
-            for o in obj.children:
-                cobj.append(o)
-        #print(*cobj, sep = '\n')
-        #print(*a_mods, sep = '\n')
-        modname = bpy.data.objects[colprop.armatures].name
-        for obj in cobj:
-            mods = []
-            for mod in obj.modifiers:
-                if mod.type == 'ARMATURE':
-                    mods.append(mod)
-            if len(mods) < 1:
-                mod = obj.modifiers.new(type= 'ARMATURE', name= modname)
-                mod.object = obj.parent.parent
-            else:
-                for mod in mods:
-                    if mod.object != obj.parent.parent:
-                        mod.object = obj.parent.parent
+        for obj in bpy.data.objects[colprop.armatures].children_recursive:
+            if obj.type == 'MESH':
+                mod = [m for m in obj.modifiers if m.type == 'ARMATURE']
+                if len(mod) == 0:
+                    mod = obj.modifiers.new(bpy.data.objects[colprop.armatures].name, 'ARMATURE')
+                    mod.object = bpy.data.objects[colprop.armatures]
+                else:
+                    mod[0].object = bpy.data.objects[colprop.armatures]
 
-        #print(len(cobj))
         return {'FINISHED'}
 
 
@@ -1046,30 +979,30 @@ class Swap_Character_Code(Operator):
 
         #change texture chunks names
         tex = collection.objects[f'#XFBIN Textures [{collection.name}]'].xfbin_texture_chunks_data.texture_chunks
+        if colprop.TexMat == True:
+            for t in tex:
+                print(t.texture_name)
+                if t.texture_name[:nc2] == armature.bones[1].name[:-2]:
+                    t.texture_name = colprop['CharacterCode'] + t.texture_name[nc2:]
+                elif t.texture_name[:nc] == armature.bones[1].name[:-4]:
+                    t.texture_name = colprop['CharacterCode'] + t.texture_name[nc:]
+                else:
+                    print(f"{t.texture_name} doesn't start with {armature.bones[1].name[:-4]}")
+                
+                #Determine Code and object locations in texture path
+                code = t.path.split('/')[-3]
+                pathob = t.path.split('/')[-1]
 
-        for t in tex:
-            print(t.texture_name)
-            if t.texture_name[:nc2] == armature.bones[1].name[:-2]:
-                t.texture_name = colprop['CharacterCode'] + t.texture_name[nc2:]
-            elif t.texture_name[:nc] == armature.bones[1].name[:-4]:
-                t.texture_name = colprop['CharacterCode'] + t.texture_name[nc:]
-            else:
-                print(f"{t.texture_name} doesn't start with {armature.bones[1].name[:-4]}")
-            
-            #Determine Code and object locations in texture path
-            code = t.path.split('/')[-3]
-            pathob = t.path.split('/')[-1]
+                #Change texture path code
+                xfclump = armature_obj.xfbin_clump_data
+                code = t.path.split('/')[-3]
+                newcode = colprop['PathCode']
+                t.path = t.path.replace(code, newcode)
 
-            #Change texture path code
-            xfclump = armature_obj.xfbin_clump_data
-            code = t.path.split('/')[-3]
-            newcode = colprop['PathCode']
-            t.path = t.path.replace(code, newcode)
-
-            #Change clump path object
-            pathob = t.path.split('/')[-1]
-            newpathob = t.texture_name + pathob[-4:]
-            t.path = t.path.replace(pathob, newpathob)
+                #Change clump path object
+                pathob = t.path.split('/')[-1]
+                newpathob = t.texture_name + pathob[-4:]
+                t.path = t.path.replace(pathob, newpathob)
 
         #remove and add models and model groups
         armature_obj.xfbin_clump_data.models.clear()
@@ -1098,45 +1031,46 @@ class Swap_Character_Code(Operator):
         xfclump.path = xfclump.path.replace(pathob, newpathob)
 
         #Swap codes in clump materials
-        for mat in xfclump.materials:
-            for texg in mat.texture_groups:
-                for t in texg.textures:
-                    if t.texture_name != 'celshade':
-                        if t.texture_name[:nc2] == armature.bones[1].name[:-2]:
-                            t.texture_name = colprop['CharacterCode'] + t.texture_name[nc2:]
-                        elif t.texture_name[:nc] == armature.bones[1].name[:-4]:
-                            t.texture_name = colprop['CharacterCode'] + t.texture_name[nc:]
-                        else:
-                            print(f"{t.texture_name} doesn't start with {armature.bones[1].name[:-4]}")
-                        
-                        #Determine Code and object locations in texture path
-                        code = t.path.split('/')[-3]
-                        pathob = t.path.split('/')[-1]
+        if colprop.TexMat == True:
+            for mat in xfclump.materials:
+                for texg in mat.texture_groups:
+                    for t in texg.textures:
+                        if t.texture_name != 'celshade':
+                            if t.texture_name[:nc2] == armature.bones[1].name[:-2]:
+                                t.texture_name = colprop['CharacterCode'] + t.texture_name[nc2:]
+                            elif t.texture_name[:nc] == armature.bones[1].name[:-4]:
+                                t.texture_name = colprop['CharacterCode'] + t.texture_name[nc:]
+                            else:
+                                print(f"{t.texture_name} doesn't start with {armature.bones[1].name[:-4]}")
+                            
+                            #Determine Code and object locations in texture path
+                            code = t.path.split('/')[-3]
+                            pathob = t.path.split('/')[-1]
 
-                        #Change clump path code
-                        xfclump = armature_obj.xfbin_clump_data
-                        code = t.path.split('/')[-3]
-                        newcode = colprop['PathCode']
-                        t.path = t.path.replace(code, newcode)
+                            #Change clump path code
+                            xfclump = armature_obj.xfbin_clump_data
+                            code = t.path.split('/')[-3]
+                            newcode = colprop['PathCode']
+                            t.path = t.path.replace(code, newcode)
 
-                        #Change clump path object
-                        pathob = t.path.split('/')[-1]
-                        newpathob = t.texture_name + pathob[-4:]
-                        t.path = t.path.replace(pathob, newpathob)
+                            #Change clump path object
+                            pathob = t.path.split('/')[-1]
+                            newpathob = t.texture_name + pathob[-4:]
+                            t.path = t.path.replace(pathob, newpathob)
 
-            if mat.material_name[:nc2] == armature.bones[1].name[:-2]:
-                mat.material_name = colprop['CharacterCode'] + mat.material_name[nc2:]
-            elif mat.material_name[:nc] == armature.bones[1].name[:-4]:
-                mat.material_name = colprop['CharacterCode'] + mat.material_name[nc:]
+                if mat.material_name[:nc2] == armature.bones[1].name[:-2]:
+                    mat.material_name = colprop['CharacterCode'] + mat.material_name[nc2:]
+                elif mat.material_name[:nc] == armature.bones[1].name[:-4]:
+                    mat.material_name = colprop['CharacterCode'] + mat.material_name[nc:]
 
-        #Reapply materials in meshes after changing the names
+            #Reapply materials in meshes after changing the names
 
-        for o in armature_obj.children:
-            for c in o.children:
-                if c.xfbin_mesh_data.xfbin_material[:nc2] == armature.bones[1].name[:-2]:
-                    c.xfbin_mesh_data.xfbin_material = colprop['CharacterCode'] + c.xfbin_mesh_data.xfbin_material[nc2:]
-                elif c.xfbin_mesh_data.xfbin_material[:nc] == armature.bones[1].name[:-4]:
-                    c.xfbin_mesh_data.xfbin_material = colprop['CharacterCode'] + c.xfbin_mesh_data.xfbin_material[nc:]
+            for o in armature_obj.children:
+                for c in o.children:
+                    if c.xfbin_mesh_data.xfbin_material[:nc2] == armature.bones[1].name[:-2]:
+                        c.xfbin_mesh_data.xfbin_material = colprop['CharacterCode'] + c.xfbin_mesh_data.xfbin_material[nc2:]
+                    elif c.xfbin_mesh_data.xfbin_material[:nc] == armature.bones[1].name[:-4]:
+                        c.xfbin_mesh_data.xfbin_material = colprop['CharacterCode'] + c.xfbin_mesh_data.xfbin_material[nc:]
 
         #change collection name and XFBIN Textures
         colname = armature.name[:-4]
@@ -1160,29 +1094,6 @@ class Swap_Character_Code(Operator):
         return {'FINISHED'}
 
 
-class GetTexturePath(Operator, ImportHelper):
-    bl_idname = "object.get_textures"
-    bl_label = "  Select Folder"
-    bl_description = ('Open texture directory')
-    
-    @classmethod
-    def poll(cls, context):
-        if bpy.context.mode == 'OBJECT' and bpy.context.scene.col_prop.armatures != "":
-            return True
-        else:
-            return False
-    
-    def execute(self, context):
-        dir = self.filepath
-        colprop = bpy.context.scene.col_prop
-        collection = bpy.context.scene.col_prop.collections
-        texture_object = '#XFBIN Textures [' + str(collection) +']'
-        #object_name = bpy.context.object.name
-        bpy.data.objects[texture_object][texture_object] = dir
-        bpy.ops.object.select_all(action='DESELECT')
-        
-        return {'FINISHED'}
-
 class Replace_Mats(Operator):
     bl_idname = "object.replace_mats"
     bl_label = "Replace Materials ID"
@@ -1201,25 +1112,29 @@ class Replace_Mats(Operator):
 
         collection_objects = [o for o in bpy.data.collections[colprop.collections].all_objects if o.type == 'MESH']
 
-        colprop.Old_Material_ID = str(colprop.Old_Material_ID.upper())
+        if colprop.AutoMatID == True:
+            Oldmat = context.object.xfbin_mesh_data['materials'][0]['material_id']
+        else:
+            Oldmat = str(colprop.Old_Material_ID.upper())
 
+        
         if bpy.context.active_object.type == 'EMPTY':
             for m in [o for o in bpy.context.active_object.children]:
-                if colprop.Old_Material_ID in m.xfbin_mesh_data.materials:
-                    m.xfbin_mesh_data.materials[colprop.Old_Material_ID].material_id = colprop.New_Material_ID      
+                if Oldmat in m.xfbin_mesh_data.materials:
+                    m.xfbin_mesh_data.materials[Oldmat].material_id = colprop.New_Material_ID      
 
         elif len(bpy.context.selected_objects) > 0:
             for m in [o for o in bpy.context.selected_objects]:
-                if colprop['Old_Material_ID'] in m.xfbin_mesh_data.materials:
-                    m.xfbin_mesh_data.materials[colprop.Old_Material_ID].material_id = colprop.New_Material_ID
+                if Oldmat in m.xfbin_mesh_data.materials:
+                    m.xfbin_mesh_data.materials[Oldmat].material_id = colprop.New_Material_ID
                 else:
                     self.report({"WARNING"}, f"The material you're attempting to replace does not exist in {m.name}")
 
         else:
             self.report({"INFO"}, f"No meshes were selected, Attempting to replace materials for meshes in the whole collecton")
             for m in [o for o in collection_objects]:
-                if colprop['Old_Material_ID'] in m.xfbin_mesh_data.materials:
-                    m.xfbin_mesh_data.materials[colprop.Old_Material_ID].material_id = colprop.New_Material_ID
+                if Oldmat in m.xfbin_mesh_data.materials:
+                    m.xfbin_mesh_data.materials[Oldmat].material_id = colprop.New_Material_ID
                 else:
                     self.report({"WARNING"}, f"The material you're attempting to replace does not exist in {m.name}")
         
@@ -1228,7 +1143,7 @@ class Replace_Mats(Operator):
 class Duplicate_XFBIN_Mat(Operator):
     bl_idname = "object.duplicate_mats"
     bl_label = "Create New XFBIN Mat"
-    bl_description = (f"Creates a separete XFBIN material for the selected mesh and applies it. EXAMPLE: if a mesh has a material called body1, it will make a duplicate copy and applies it")
+    bl_description = (f"Creates a separate XFBIN material for the selected mesh and applies it. EXAMPLE: if a mesh has a material called body1, it will make a duplicate copy and applies it")
     
     @classmethod
     def poll(cls, context):
@@ -1248,8 +1163,11 @@ class Duplicate_XFBIN_Mat(Operator):
         matc = active.parent.parent.xfbin_clump_data.materials[mat]
 
         new = active.parent.parent.xfbin_clump_data.materials.add()
+        if colprop.XFBIN_Mat != '':
+            new.material_name = colprop.XFBIN_Mat
+        else:
+            new.material_name = matc.material_name + 'NEW'
 
-        new.material_name = matc.material_name + "NEW"
 
         new.field02 = matc.field02
 
@@ -1273,120 +1191,162 @@ class Duplicate_XFBIN_Mat(Operator):
                 new['texture_groups'][i]['textures'][a]['path'] = matc['texture_groups'][i]['textures'][a]['path']
                 new['texture_groups'][i]['textures'][a]['texture'] = matc['texture_groups'][i]['textures'][a]['texture']
                 new['texture_groups'][i]['textures'][a]['texture_name'] = matc['texture_groups'][i]['textures'][a]['texture_name']
-        bpy.context.active_object.xfbin_mesh_data.xfbin_material = bpy.context.active_object.xfbin_mesh_data.xfbin_material + 'NEW'
-
-
-        return {'FINISHED'}
-
-class ApplyTextures(Operator):
-    bl_idname = "object.apply_texture"
-    bl_label = "Apply Textures"
-    bl_description = ('Link textures to material and apply them to view on model')
-     
-    @classmethod
-    def poll(cls, context):
-        if bpy.context.mode == 'OBJECT' and bpy.context.scene.col_prop.armatures != "" and '#XFBIN Textures [{}]'.format(bpy.context.scene.col_prop.collections) in bpy.data.objects['#XFBIN Textures [{}]'.format(bpy.context.scene.col_prop.collections)]:
-            return True
+        if colprop.XFBIN_Mat != '':
+            bpy.context.active_object.xfbin_mesh_data.xfbin_material = colprop.XFBIN_Mat
         else:
-            return False
-        
-    def execute(self, context):
-        
-        #Define collections
-        collection = bpy.context.scene.col_prop.collections
-        colprop = bpy.context.scene.col_prop
-        
-        # Get texture paths
-        texture_object = '#XFBIN Textures [' + str(collection) +']'
-        path = bpy.data.objects[texture_object][texture_object]
-        print(path)
-        texture_files = [f for f in listdir(path) if isfile(join(path, f))]
-        texture_ext = texture_files[0][-4:]
-        
-        #Set context and select respective armatures
-        bpy.data.objects[texture_object].select_set(True)
-        bpy.context.scene.objects[colprop.collections].select_set(True)
-        bpy.context.view_layer.objects.active = bpy.data.objects[colprop.armatures]
-        
-        #Get materials and number of materials
-        xfbin_materials_count = len(bpy.context.object.xfbin_clump_data.materials)
-        xfbin_material = {} #Dictionary containing material and it's corresponding textures
-        
-        
-        #Populate dictonary for Blender use 
-        for i in range(xfbin_materials_count): #Append '[XFBIN]' to material name for Blender use
-            xfbin_material['[XFBIN] '+ bpy.context.object.xfbin_clump_data.materials[i].material_name] = bpy.context.object.xfbin_clump_data.materials[i].texture_groups[0].textures[0].texture_name
-        print(xfbin_material)
+            bpy.context.active_object.xfbin_mesh_data.xfbin_material = bpy.context.active_object.xfbin_mesh_data.xfbin_material + 'NEW'
 
-        
-        #Apply Image Texture to material from directory and link corresponding texture
-        for i in range(len(xfbin_material)):
-            mat = bpy.data.materials[list(xfbin_material)[i]]
-            mat.use_nodes = True
-            bsdf = mat.node_tree.nodes.get("Principled BSDF")
-            assert(bsdf)
-            surface = mat.node_tree.nodes["Principled BSDF"]
-            texImage = mat.node_tree.nodes.new('ShaderNodeTexImage')
-            texImage.image = bpy.data.images.load(path + list(xfbin_material.values())[i] + texture_ext)
-            mat.node_tree.links.new(surface.inputs['Base Color'], texImage.outputs['Color'])
-        bpy.ops.object.select_all(action='DESELECT')    
-        bpy.context.space_data.shading.color_type = 'TEXTURE'
-        
-        #Delete unused and unlinked textures
-        original_type = bpy.context.area.type
-        bpy.context.area.type = "OUTLINER"
-        bpy.context.space_data.display_mode = 'ORPHAN_DATA'
-        bpy.ops.outliner.orphans_purge()
-        bpy.context.area.type = original_type
 
         return {'FINISHED'}
 
-class UnlinkTextures(Operator):
-    bl_idname = "object.unlink_textures"
-    bl_label = "  Unlink texture(s)"
-    bl_description = ('Unlink active textures')
+class Copy_Bone_Pos(Operator):
+    bl_idname = "object.copy_pos"
+    bl_label = "Copy Bone Positions"
+    bl_description = (f"Copy bone positions from target armature to the armature at the top (Main aramture)")
     
     @classmethod
     def poll(cls, context):
-        if bpy.context.mode == 'OBJECT' and bpy.context.scene.col_prop.armatures != "":
+        if bpy.context.mode == 'OBJECT' and bpy.context.scene.col_prop.target_armature != '':
             return True
         else:
             return False
     
     def execute(self, context):
- 
-        collections = bpy.data.collections
         colprop = bpy.context.scene.col_prop
+        armature_obj = bpy.data.objects[colprop.armatures]
+        target_obj = bpy.data.objects[colprop.target_armature]
+
+        # A dictionary with the bones I want to edit
+        target_bones = ['r clavicle', 'r upperarm', 'r forearm', 'r hand', 'r finger0', 'r finger1',
+                'r finger2','r finger3', 'r finger4','r finger01', 'r finger02', 'r finger11',
+                'r finger12', 'r finger21', 'r finger22', 'r finger31', 'r finger32', 'r finger41',
+                'r finger42', 'l clavicle', 'l upperarm', 'l forearm', 'l hand', 'l finger0','l finger1',
+                'l finger2','l finger3','l finger4', 'l finger01', 'l finger02', 'l finger11', 'l finger12',
+                'l finger21', 'l finger22', 'l finger31', 'l finger32', 'l finger41', 'l finger42',
+                'spine1', 'spine', 'pelvis', 'l thigh', 'l calf', 'l foot', 'l toe0', 'r thigh',
+                'r calf', 'r foot', 'r toe0', 'l arm bone01', 'l arm bone02', 'l arm bone03'
+                'l arm bone04', 'l arm bone05', 'l arm bone06', 'r arm bone01', 'r arm bone02',
+                'r arm bone03', 'r arm bone04', 'r arm bone05', 'r arm bone06', 'l foot bone01',
+                'l foot bone02', 'l foot bone03', 'l foot bone04', 'l foot bone05', 'r foot bone01',
+                'r foot bone02', 'r foot bone03', 'r foot bone04', 'r foot bone05', 'left sleeve',
+                'right sleeve']
+
+
+        bpy.ops.object.remove_char_code()
+        # A dictionary with bones from the base armature that matches the ones in target_bones
+        base_bones = [b.name for b in armature_obj.data.bones if b.name in target_bones]
+
+        # A dictionary with bone from the target armature that matches the ones from the base armature
+        btoc = [b.name for b in target_obj.data.bones if b.name in base_bones]
+
+        # Select the target armature and switch to edit mode
+        bpy.context.view_layer.objects.active = target_obj
+        bpy.ops.object.editmode_toggle()
+
+        # Select matching bones
+        for b in target_obj.data.edit_bones:
+            if b.name in btoc:
+                b.select_head = True
+                b.select_tail = True
+                b.select = True
+
+        # Duplicate, separate and switch back to object mode
+        bpy.ops.armature.duplicate()
+        bpy.ops.armature.separate()
+        bpy.ops.object.editmode_toggle()
+
+        # Select both the new armature and the base armature
         bpy.ops.object.select_all(action='DESELECT')
-        
-    
-        #Get materials and number of materials
-        xfbin_materials_count = len(bpy.context.object.xfbin_clump_data.materials)
-        xfbin_material = {} #Dictionary containing material and it's corresponding textures 
-        
-        #Populate dictonary for Blender use 
-        for i in range(xfbin_materials_count): #Append '[XFBIN]' to material name for Blender use
-            xfbin_material['[XFBIN] '+ bpy.context.object.xfbin_clump_data.materials[i].material_name] = bpy.context.object.xfbin_clump_data.materials[i].texture_groups[0].textures[0].texture_name
-        
-        
-        for obj in collections[colprop.collections].all_objects:
-            if (obj.type == 'MESH'):
-                obj.hide_set(False)
-                obj.select_set(True)
-                
-                #mat = bpy.context.object.data.materials[0]
-                mat = obj.data.materials[0]
-                surface = mat.node_tree.nodes["Principled BSDF"]
-                mat.use_nodes = False
-                #print(mat.node_tree.nodes["Principled BSDF"].inputs[0])
-                #mat.node_tree.nodes.delete('ShaderNodeTexImage')
-                #mat.node_tree.nodes.remove( node_to_delete )
-                
-                
-        
-        #bpy.ops.object.select_all(action='DESELECT')    
-        
-                
-        
+        bpy.data.objects[target_obj.name + '.001'].select_set(True)
+        bpy.data.objects[armature_obj.name].select_set(True)
+
+        # Merge both armatures then switch to edit mode
+        bpy.context.view_layer.objects.active = armature_obj
+        bpy.ops.object.join()
+        bpy.ops.object.editmode_toggle()
+
+        # Move bones from base armature to the positions of bones from target armature
+        for b in armature_obj.data.edit_bones:
+            if b.name in btoc:
+                armature_obj.data.edit_bones[b.name].matrix = armature_obj.data.edit_bones[b.name + '.001'].matrix
+        # Delete duplicate bones
+            if b.name.endswith('.001'):
+                b.select_head = True
+                b.select_tail = True
+                b.select = True
+                bpy.ops.armature.delete()
+
+        bpy.ops.object.editmode_toggle()
+
+
         return {'FINISHED'}
 
+
+class CreateClone(Operator):
+    bl_idname = "object.clone"
+    bl_label = "Create Clone"
+    bl_description = (f"No description")
+    
+    @classmethod
+    def poll(cls, context):
+        if bpy.context.mode == 'OBJECT':
+            return True
+        else:
+            return False
+    
+    def execute(self, context):
+
+        colprop = bpy.context.scene.col_prop
+
+        bpy.ops.object.add_char_code()
+
+        bpy.data.objects[colprop.armatures].select = True
+
+        for o in bpy.data.objects[colprop.armatures].children:
+            o.select = True
+            for c in o.children:
+                c.select = True
+
+        bpy.ops.object.duplicate()
+
+        for o in bpy.context.selected_objects:
+            o.name = 'xxxx' + o.name[4:]
+            if o.name.startswith('xxxx') and o.name[-8:-4] == ' [C]':
+                bpy.data.objects[o.name].data.bones[1].name = bpy.data.objects[o.name].data.bones[1].name[:-4] + colprop.CloneID
+                for b in bpy.data.objects[o.name].data.bones:
+                    if b != bpy.data.objects[o.name].data.bones[1]:
+                        b.name = bpy.data.objects[o.name].data.bones[1].name + b.name[8:]
+                o.name = bpy.data.objects[o.name].data.bones[1].name[:-4] + colprop.BodID + ' [C]'
+
+            #delete .001, .002 etc... to ensure no errors happen
+        bpy.ops.object.fix_names()
+
+
+        a = [o.name for o in bpy.context.selected_objects if o.name.endswith('[C]')]
+        for o in bpy.data.objects[a[0]].children:
+            if o.name.startswith('xxxx') and o.name[:5] != 'xxxx_':
+                o.name = bpy.data.objects[a[0]].data.bones[1].name + o.name[8:]
+
+            if o.name.startswith('xxxx_'):
+                for c in o.children:
+                    bpy.data.objects.remove(bpy.data.objects[c.name])
+                bpy.data.objects.remove(bpy.data.objects[o.name])
+                
+        bpy.data.objects[a[0]].xfbin_clump_data.models.clear()
+        bpy.data.objects[a[0]].xfbin_clump_data.model_groups.clear()
+        g = bpy.data.objects[a[0]].xfbin_clump_data.model_groups.add()
+        g.name = 'Group'
+        g.unk = '7F 7F FF FF'
+        for child in bpy.data.objects[a[0]].children:
+            m = bpy.data.objects[a[0]].xfbin_clump_data.models.add()
+            #m.value = child.name
+            m.empty = child
+            gm = g.models.add()
+            #gm.name = child.name
+            gm.empty = child
+            child.xfbin_nud_data.mesh_bone = child.name
+
+        bpy.ops.object.select_all(action='DESELECT')
+
+
+        return {'FINISHED'}

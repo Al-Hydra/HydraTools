@@ -15,7 +15,7 @@ bl_info = {
     "name" : "Hydra Tools",
     "author" : "HydraBladeZ, Dei",
     "description" : "",
-    "blender" : (3, 1, 0),
+    "blender" : (3, 0, 0),
     "version" : (1, 1, 0),
     "location" : "View3D",
     "warning" : "",
@@ -23,22 +23,29 @@ bl_info = {
 }
 
 import bpy
-from . Panel import (Panel, ColProperty)
+from . Panels import (ColProperty, Panel_Main, Panel_Armature, Panel_Material, Panel_Swap, Panel_misc)
 from . Operators import (RemoveLOD, AddVertColors, RemoveVertColors,
     PaintVertexColors, ApplyRestPose, RemoveCharCode, RenameBones, AddCharCode,
-    StormIK, FixNames, ArmatureModifier, GetTexturePath, ApplyTextures,
-    UnlinkTextures, Swap_Character_Code, Replace_Mats, Duplicate_XFBIN_Mat)
+    StormIK, FixNames, ArmatureModifier, Swap_Character_Code,Replace_Mats,
+    Duplicate_XFBIN_Mat, Copy_Bone_Pos, CreateClone)
 
-classes = (Panel, RemoveLOD, ColProperty, AddVertColors, RemoveVertColors,
-    PaintVertexColors, ApplyRestPose, RemoveCharCode, RenameBones, AddCharCode,
-    StormIK, FixNames, ArmatureModifier, GetTexturePath, ApplyTextures,
-    UnlinkTextures, Swap_Character_Code, Replace_Mats, Duplicate_XFBIN_Mat)
-    
+classes = (Panel_Main, Panel_Armature, Panel_Material, Panel_misc, Panel_Swap,
+    RemoveLOD, ColProperty, AddVertColors, RemoveVertColors,PaintVertexColors,
+    ApplyRestPose, RemoveCharCode, RenameBones, AddCharCode,StormIK, FixNames,
+    ArmatureModifier, Swap_Character_Code,Replace_Mats, Duplicate_XFBIN_Mat,
+    Copy_Bone_Pos, CreateClone)
+
+def search_armature(self, object):
+    colprop = bpy.context.scene.col_prop
+    return object.type == 'ARMATURE' and object.name != colprop.armatures
+
 def register():
     for c in classes:
         bpy.utils.register_class(c)
+    bpy.types.Scene.armaturelist = bpy.props.PointerProperty(type=bpy.types.Object, poll=search_armature)
     bpy.types.Scene.col_prop = bpy.props.PointerProperty(type = ColProperty)
 def unregister():
     for c in classes:
         bpy.utils.unregister_class(c)
+    del bpy.types.Scene.armaturelist
     del bpy.types.Scene.col_prop
