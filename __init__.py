@@ -23,29 +23,49 @@ bl_info = {
 }
 
 import bpy
-from . Panels import (ColProperty, Panel_Main, Panel_Armature, Panel_Material, Panel_Swap, Panel_misc)
+from . Panels import (ColProperty, Panel_Main, Panel_Armature, Panel_Material, Panel_Swap, Panel_dict, Panel_misc,
+                    BoneList, DICT_UL_BoneList)
 from . Operators import (RemoveLOD, AddVertColors, RemoveVertColors,
     PaintVertexColors, ApplyRestPose, RemoveCharCode, RenameBones, AddCharCode,
     StormIK, FixNames, ArmatureModifier, Swap_Character_Code,Replace_Mats,
-    Duplicate_XFBIN_Mat, Copy_Bone_Pos, CreateClone)
+    Duplicate_XFBIN_Mat, Copy_Bone_Pos, CreateClone, CreateBoneList, ExportDict)
 
-classes = (Panel_Main, Panel_Armature, Panel_Material, Panel_misc, Panel_Swap,
+classes = (Panel_Main, Panel_Armature, Panel_Material, Panel_misc, Panel_Swap,Panel_dict,
     RemoveLOD, ColProperty, AddVertColors, RemoveVertColors,PaintVertexColors,
     ApplyRestPose, RemoveCharCode, RenameBones, AddCharCode,StormIK, FixNames,
     ArmatureModifier, Swap_Character_Code,Replace_Mats, Duplicate_XFBIN_Mat,
-    Copy_Bone_Pos, CreateClone)
+    Copy_Bone_Pos, CreateClone, BoneList, CreateBoneList, DICT_UL_BoneList, ExportDict)
 
 def search_armature(self, object):
     colprop = bpy.context.scene.col_prop
     return object.type == 'ARMATURE' and object.name != colprop.armatures
 
+def main_poll(self, object):
+    
+    return object.type == 'ARMATURE' and object != bpy.context.scene.target_armature
+
+def target_poll(self, object):
+    armature_main = bpy.context.scene.main_armature
+    return object.type == 'ARMATURE' and object != armature_main
+
 def register():
     for c in classes:
         bpy.utils.register_class(c)
     bpy.types.Scene.armaturelist = bpy.props.PointerProperty(type=bpy.types.Object, poll=search_armature)
+    bpy.types.Scene.main_armature = bpy.props.PointerProperty(type=bpy.types.Object, poll=main_poll)
+    bpy.types.Scene.target_armature = bpy.props.PointerProperty(type=bpy.types.Object, poll=target_poll)
+    bpy.types.Scene.bone_index = bpy.props.IntProperty()
     bpy.types.Scene.col_prop = bpy.props.PointerProperty(type = ColProperty)
+    bpy.types.Scene.bone_dict_props = bpy.props.PointerProperty(type = BoneList)
+    ColProperty.bone_dict = bpy.props.CollectionProperty(type = BoneList)
+
 def unregister():
     for c in classes:
         bpy.utils.unregister_class(c)
     del bpy.types.Scene.armaturelist
+    del bpy.types.Scene.main_armature
+    del bpy.types.Scene.target_armature
+    del bpy.types.Scene.bone_index
     del bpy.types.Scene.col_prop
+    del bpy.types.Scene.bone_dict_props
+    del ColProperty.bone_dict

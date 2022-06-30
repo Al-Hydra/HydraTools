@@ -1,7 +1,7 @@
 import bpy, json, os
 from bpy.props import EnumProperty, BoolProperty, StringProperty, FloatVectorProperty
 from bpy.types import (Operator)
-from bpy_extras.io_utils import ImportHelper
+from bpy_extras.io_utils import ImportHelper, ExportHelper
 from rna_prop_ui import PropertyPanel
 from os import listdir
 from os.path import isfile, join
@@ -23,13 +23,12 @@ class RemoveLOD(bpy.types.Operator):
         colprop = bpy.context.scene.col_prop
         collection = bpy.data.collections[colprop.collections]
         armature_obj = bpy.data.objects[colprop.armatures]
-        clumpdata = armature_obj.xfbin_clump_data
             
         lod = {"_lod1", "_lod2", "lod01", "_LOD1", "_LOD2",
         "_shadow", "_blur0 shadow", "_blur0 shadow01"}
 
         #delete any mesh that contains any of the strings in the list above
-        for obj in collection.all_objects:
+        for obj in collection.objects:
             if any(x in obj.name for x in lod):
                 bpy.data.objects.remove(obj)
             
@@ -66,7 +65,7 @@ class AddVertColors(Operator):
         
         collections = bpy.data.collections
         colprop = bpy.context.scene.col_prop
-        for obj in collections[colprop.collections].all_objects:
+        for obj in collections[colprop.collections].objects:
             if obj.type == 'MESH' and len(obj.data.vertex_colors) == 0:
                     obj.data.vertex_colors.new('Colors')
             else:
@@ -90,7 +89,7 @@ class RemoveVertColors(Operator):
         
         collections = bpy.data.collections
         colprop = bpy.context.scene.col_prop
-        for obj in collections[colprop.collections].all_objects:
+        for obj in collections[colprop.collections].objects:
             if (obj.type == 'MESH'):
                 for vc in obj.data.vertex_colors:
                     obj.data.vertex_colors.remove(vc)  
@@ -117,7 +116,7 @@ class PaintVertexColors(Operator):
         colprop = bpy.context.scene.col_prop
         bpy.ops.object.select_all(action='DESELECT')
         
-        for obj in collections[colprop.collections].all_objects:
+        for obj in collections[colprop.collections].objects:
             if (obj.type == 'MESH') and obj.data.vertex_colors[0]:
                 for vc in obj.data.vertex_colors[0].data:
                     color = colprop.VertColorPick
@@ -212,7 +211,7 @@ class RemoveCharCode(Operator):
     
 class RenameBones(Operator, ImportHelper):
     bl_idname = "object.rename_script"
-    bl_label = "Translate Bones"
+    bl_label = "Rename Bones"
     bl_description = ("Rename bone names using a bone name dictionary.\n"
     "This is useful when you want to transfer rigs")
     
@@ -307,7 +306,7 @@ class Blend_Mode_Opaque(Operator):
         collections = bpy.data.collections
         colprop = bpy.context.scene.col_prop
         bpy.ops.object.select_all(action='DESELECT')
-        for obj in collections[colprop.collections].all_objects:
+        for obj in collections[colprop.collections].objects:
             if (obj.type == 'MESH'):
                 obj.hide_set(False)
                 obj.select_set(True)
@@ -349,7 +348,7 @@ class StormIK(Operator):
         collection = bpy.data.collections[colprop.collections]
 
         if ad_name != a_name:
-            for a in collection.all_objects:
+            for a in collection.objects:
                 b = []
                 if a.type == 'ARMATURE':
                     b.append(a)
@@ -873,7 +872,7 @@ class FixNames(Operator):
         if collection.name[-4:-2] == '.0':
             collection.name = collection.name[0:-4]
         #fix object names and remove all unused names in BlendData
-        for o in collection.all_objects:
+        for o in collection.objects:
             if o.name[-4:-2] == '.0':
                 o.name = o.name[0:-4]
             elif o.name.startswith('#XFBIN') and o.name[-5:-3] == '.0' :
@@ -882,7 +881,7 @@ class FixNames(Operator):
             if m.users == 0:
                 bpy.data.meshes.remove(m)
         #fix armature name
-        for a in collection.all_objects:
+        for a in collection.objects:
             if a.type == 'ARMATURE':
                 a.data.name = a.name
 
@@ -946,7 +945,7 @@ class Swap_Character_Code(Operator):
         nc = len(armature.bones[1].name[:-4]) #code = 4
         nc2 = len(armature.bones[1].name[:-2]) #code00 = 6
         clumpdata = armature_obj.xfbin_clump_data
-        for o in collection.all_objects:
+        for o in collection.objects:
             
             #Armature object
             if o.name[:nc2] == armature.bones[1].name[:-2] and o.name.endswith('[C]'):
@@ -1082,7 +1081,7 @@ class Swap_Character_Code(Operator):
         colprop.armatures = armname
 
         #correct XFBIN Textures name
-        for o in collection.all_objects:
+        for o in collection.objects:
             if o.name.startswith('#XFBIN Textures') :
                 o.name = o.name[0:16] + '[' + collection.name + ']'
 
@@ -1110,7 +1109,7 @@ class Replace_Mats(Operator):
 
         colprop = bpy.context.scene.col_prop
 
-        collection_objects = [o for o in bpy.data.collections[colprop.collections].all_objects if o.type == 'MESH']
+        collection_objects = [o for o in bpy.data.collections[colprop.collections].objects if o.type == 'MESH']
 
         if colprop.AutoMatID == True:
             Oldmat = context.object.xfbin_mesh_data['materials'][0]['material_id']
@@ -1206,15 +1205,16 @@ class Copy_Bone_Pos(Operator):
     
     @classmethod
     def poll(cls, context):
-        if bpy.context.mode == 'OBJECT' and bpy.context.scene.col_prop.target_armature != '':
+        if bpy.context.mode == 'OBJECT':
             return True
         else:
             return False
     
     def execute(self, context):
         colprop = bpy.context.scene.col_prop
+        armaturename = bpy.context.scene.armaturelist.name
         armature_obj = bpy.data.objects[colprop.armatures]
-        target_obj = bpy.data.objects[colprop.target_armature]
+        target_obj = bpy.data.objects[armaturename]
 
         # A dictionary with the bones I want to edit
         target_bones = ['r clavicle', 'r upperarm', 'r forearm', 'r hand', 'r finger0', 'r finger1',
@@ -1257,8 +1257,13 @@ class Copy_Bone_Pos(Operator):
 
         # Select both the new armature and the base armature
         bpy.ops.object.select_all(action='DESELECT')
-        bpy.data.objects[target_obj.name + '.001'].select_set(True)
-        bpy.data.objects[armature_obj.name].select_set(True)
+        if bpy.data.objects.get(target_obj.name + '.001') is not None:
+            bpy.data.objects[target_obj.name + '.001'].select_set(True)
+            bpy.data.objects[armature_obj.name].select_set(True)
+        else:
+            self.report({'ERROR'}, f"Didn't find the temporary armature '{target_obj.name + '.001'}' make sure you have the correct armature selected"
+            "\n and the bone names are correct")
+            return {'CANCELLED'}
 
         # Merge both armatures then switch to edit mode
         bpy.context.view_layer.objects.active = armature_obj
@@ -1277,7 +1282,6 @@ class Copy_Bone_Pos(Operator):
                 bpy.ops.armature.delete()
 
         bpy.ops.object.editmode_toggle()
-
 
         return {'FINISHED'}
 
@@ -1349,4 +1353,51 @@ class CreateClone(Operator):
         bpy.ops.object.select_all(action='DESELECT')
 
 
+        return {'FINISHED'}
+
+class CreateBoneList(bpy.types.Operator):
+    bl_idname = "object.build_bone_list"
+    bl_label = "Create Bone List"
+    bl_description = "Builds the bone list from the animation and tries to automatically detect and match bones"
+
+    def execute(self, context):
+        colprop = bpy.context.scene.col_prop
+        
+        source = context.scene.main_armature
+        target = context.scene.target_armature
+        if source is None or target is None:
+            self.report({'ERROR'}, "Please select both armatures")
+            return {'CANCELLED'}
+
+        # Clear the bone retargeting list
+        colprop.bone_dict.clear()
+
+        for bone in source.data.bones:
+            add = colprop.bone_dict.add()
+            add.bone_main = bone.name
+
+            if bone.name in target.data.bones:
+                add.bone_target = bone.name
+
+        return {'FINISHED'}
+
+class ExportDict(bpy.types.Operator, ExportHelper):
+    bl_idname = "object.export_dict"
+    bl_label = "Export Bones Dict"
+    bl_description = "Export your custom naming schemes"
+
+    filename_ext = ".json"
+    filter_glob: bpy.props.StringProperty(default='*.json;', options={'HIDDEN'})
+
+    def execute(self, context):
+        
+        bone_dictionary = {}
+        for i in range(len(context.scene.col_prop.bone_dict)):
+            bone_dictionary[context.scene.col_prop.bone_dict[i].bone_main] = context.scene.col_prop.bone_dict[i].bone_target
+        
+        #save the dictionary to a json file
+        with open(self.filepath, 'w') as f:
+            json.dump(bone_dictionary, f, indent=4)
+        
+        self.report({'INFO'}, "Saved bone dictionary to " + self.filepath)
         return {'FINISHED'}

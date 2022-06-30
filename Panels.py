@@ -1,5 +1,5 @@
-import bpy
-from bpy.props import EnumProperty, BoolProperty, StringProperty, FloatVectorProperty, StringProperty
+import bpy, json
+from bpy.props import EnumProperty, BoolProperty, StringProperty, FloatVectorProperty, StringProperty, CollectionProperty, IntProperty, FloatProperty
 from bpy.types import (Panel, Collection, PropertyGroup)
 
 class Panel_Main(Panel):
@@ -87,7 +87,10 @@ class Panel_Material(Panel):
 
         row = layout.row()
         if colprop.AutoMatID == True:
-            row.label(text= f"Main Material ID = {obj.xfbin_mesh_data['materials'][0]['material_id']}")
+            if obj.type == 'MESH' and obj.xfbin_mesh_data is not None and len(obj.xfbin_mesh_data.materials.keys()) > 0:
+                row.label(text= f"Main Material ID = {obj.xfbin_mesh_data.materials[0]['material_id']}")
+            else:
+                row.label(text= 'No Data')
         else:
             row.prop(colprop, 'Old_Material_ID')
         
@@ -172,6 +175,62 @@ class Panel_misc(Panel):
         row.operator("object.fix_names")
         row = layout.row()
         row.operator("object.add_armature_modifier")
+
+class Panel_dict(Panel):
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_idname = "HYDRA_PT_Panel_dict"
+    bl_label = "Dict Tool"
+    bl_category = "HydraTools"
+    bl_options = {"DEFAULT_CLOSED"}
+
+    @classmethod
+    def poll(cls, context):
+        return len(bpy.data.collections) > 0
+
+    def draw(self, context):
+        layout = self.layout
+        scene = context.scene
+        colprop = bpy.context.scene.col_prop
+         
+        row = layout.row()
+        col = row.column_flow(columns=2, align=True)
+        row = layout.row()
+        row.operator('object.build_bone_list')
+        col.prop_search(scene, 'main_armature', bpy.data, 'objects', text= 'Base')
+        col.prop_search(scene, 'target_armature', bpy.data, 'objects', text= 'Target')
+
+        obj = context.object
+        box = layout.box()
+        box.label(text = 'Dictionary:')
+        row = box.row()
+        row.template_list("DICT_UL_BoneList", "BoneList", colprop, "bone_dict", scene, "bone_index", rows=1, maxrows=10)
+        row = layout.row()
+        row.operator('object.export_dict')
+
+
+
+class BoneList(bpy.types.PropertyGroup):
+    
+    bone_main: StringProperty(
+    name = 'Bone Main',
+    )
+    bone_target: StringProperty(
+    name = 'Bone Target',
+    )
+
+
+class DICT_UL_BoneList(bpy.types.UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        layout = layout.split(factor=0.36, align=True)
+
+        # Displays source bone
+        layout.label(text=item.bone_main)
+
+        # Displays target bone
+        if context.scene.target_armature:
+            layout.prop_search(item, 'bone_target', bpy.context.scene.target_armature.pose, "bones", text='')
+
 
 class ColProperty(PropertyGroup):
 
