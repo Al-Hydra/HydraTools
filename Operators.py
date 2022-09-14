@@ -5,7 +5,8 @@ from bpy_extras.io_utils import ImportHelper, ExportHelper
 from rna_prop_ui import PropertyPanel
 from os import listdir
 from os.path import isfile, join
-
+from .shaders import (F00A, _02_F00A, _05_F00D, _01_F003, _05_F002, _07_F002, _07_F010, _07_F00D, _01_F002, _01_F008, E002,
+                      _01_F00F, _03_F00F)
 class RemoveLOD(bpy.types.Operator):
     bl_idname = "object.remove_lod"
     bl_label = "Remove LOD"
@@ -236,7 +237,8 @@ class RenameBones(Operator, ImportHelper):
         a_object = bpy.data.objects[colprop.armatures]    
         for bone in [*a_object.data.bones]:
             if bone.name in bone_dict.keys():
-                bone.name = bone_dict[bone.name]
+                if bone_dict[bone.name] != '':
+                    bone.name = bone_dict[bone.name]
         return {'FINISHED'}
 
 
@@ -343,21 +345,15 @@ class StormIK(Operator):
         'hair_bl02', 'hair_bc03', 'hair_br02', 'hair_fl02', 'hair_fr02', 'tongue04',
         'tongue03', 'tongue02', 'spine', 'spine1', 'neck']
 
-        ad_name = bpy.data.objects[colprop.armatures].data.name
-        a_name = bpy.data.objects[colprop.armatures].name
+        armature_data = bpy.data.objects[colprop.armatures].data
+        armature = bpy.data.objects[colprop.armatures]
         collection = bpy.data.collections[colprop.collections]
+        
+        if armature_data.name != armature.name:
+            armature_data.name = armature.name
 
-        if ad_name != a_name:
-            for a in collection.objects:
-                b = []
-                if a.type == 'ARMATURE':
-                    b.append(a)
-                for c in b:
-                    c.data.name = c.name
-                    self.report({'INFO'}, f"fixed armature name")
 
         editbone = bpy.data.armatures[colprop.armatures].edit_bones
-        model_bones = bpy.data.armatures[colprop.armatures].bones
 
         bpy.ops.object.remove_char_code()
         bpy.context.view_layer.objects.active = bpy.data.objects[colprop.armatures]
@@ -365,11 +361,10 @@ class StormIK(Operator):
             bpy.ops.object.editmode_toggle()
 
         for b in bones:
-            if b in model_bones:
-                print(f"Connected ({b}) bone")
+            if b in editbone:
                 editbone[b].parent.tail = editbone[b].head
                 editbone[b].use_connect = True
-
+                print(f"Connected ({b}) bone")
 
         #Re-Parent bones
         #------------------------------------------------------------
@@ -1234,7 +1229,8 @@ class Copy_Bone_Pos(Operator):
 
         bpy.ops.object.remove_char_code()
         # A dictionary with bones from the base armature that matches the ones in target_bones
-        base_bones = [b.name for b in armature_obj.data.bones if b.name in target_bones]
+        #base_bones = [b.name for b in armature_obj.data.bones if b.name in target_bones]
+        base_bones = [b.name for b in armature_obj.data.bones]
 
         # A dictionary with bone from the target armature that matches the ones from the base armature
         btoc = [b.name for b in target_obj.data.bones if b.name in base_bones]
@@ -1304,12 +1300,11 @@ class CreateClone(Operator):
 
         bpy.ops.object.add_char_code()
 
-        bpy.data.objects[colprop.armatures].select = True
+        bpy.data.objects[colprop.armatures].select_set(True)
 
-        for o in bpy.data.objects[colprop.armatures].children:
-            o.select = True
-            for c in o.children:
-                c.select = True
+
+        for o in bpy.data.objects[colprop.armatures].children_recursive:
+            o.select_set(True)
 
         bpy.ops.object.duplicate()
 
@@ -1321,12 +1316,15 @@ class CreateClone(Operator):
                     if b != bpy.data.objects[o.name].data.bones[1]:
                         b.name = bpy.data.objects[o.name].data.bones[1].name + b.name[8:]
                 o.name = bpy.data.objects[o.name].data.bones[1].name[:-4] + colprop.BodID + ' [C]'
-
-            #delete .001, .002 etc... to ensure no errors happen
+        
+        #delete .001, .002 etc... to ensure no errors happen
         bpy.ops.object.fix_names()
 
-
         a = [o.name for o in bpy.context.selected_objects if o.name.endswith('[C]')]
+       
+        #make sure that armature data name = armature object name
+        bpy.data.objects[a[0]].data.name = bpy.data.objects[a[0]].name
+        
         for o in bpy.data.objects[a[0]].children:
             if o.name.startswith('xxxx') and o.name[:5] != 'xxxx_':
                 o.name = bpy.data.objects[a[0]].data.bones[1].name + o.name[8:]
@@ -1343,14 +1341,223 @@ class CreateClone(Operator):
         g.unk = '7F 7F FF FF'
         for child in bpy.data.objects[a[0]].children:
             m = bpy.data.objects[a[0]].xfbin_clump_data.models.add()
-            #m.value = child.name
             m.empty = child
             gm = g.models.add()
-            #gm.name = child.name
             gm.empty = child
             child.xfbin_nud_data.mesh_bone = child.name
 
         bpy.ops.object.select_all(action='DESELECT')
+
+
+        return {'FINISHED'}
+
+class Create_bod1_f(Operator):
+    bl_idname = "object.bod1f"
+    bl_label = "Create bod1_f model"
+    bl_description = (f"Makes a mirrored model to work with Jojo ASBR")
+    
+    @classmethod
+    def poll(cls, context):
+        if context.mode == 'OBJECT':
+            return True
+        else:
+            return False
+    
+    def execute(self, context):
+
+        colprop = context.scene.col_prop
+
+        collection = bpy.data.collections[colprop.collections]
+
+        new_col = bpy.data.collections.new(f'{collection.name}_f')
+
+        bpy.context.collection.children.link(new_col)
+
+        bpy.ops.object.remove_char_code()
+        for obj in collection.objects:
+            #Dynamics object
+            if obj.name.startswith('#XFBIN Dynamics'):
+                #create the object
+                dyn_obj = bpy.data.objects.new(f'#XFBIN Dynamics [{collection.name}_f]', None)
+                dyn_obj.empty_display_type = obj.empty_display_type
+                dyn_obj.empty_display_size = obj.empty_display_size
+                #link the object
+                new_col.objects.link(dyn_obj)
+                
+                #copy props from old object
+                bpy.context.view_layer.objects.active = obj
+                bpy.ops.xfbin_panel.copy_group(prop_path='xfbin_dynamics_data', prop_name='Dynamics Properties')
+                
+                #paste props to the new object
+                bpy.context.view_layer.objects.active = dyn_obj
+                bpy.ops.xfbin_panel.paste_group(prop_path='xfbin_dynamics_data', prop_name='Dynamics Properties')
+                
+                #correct clump name and path
+                clump_name = obj.xfbin_dynamics_data.clump_name
+                path = obj.xfbin_dynamics_data.path
+                dyn_obj.xfbin_dynamics_data.clump_name = obj.xfbin_dynamics_data.clump_name + '_f'
+                dyn_obj.xfbin_dynamics_data.path = f'{obj.xfbin_dynamics_data.path[:-(len(clump_name) + 4)]}{clump_name}_f.max'
+            
+            #Textures object
+            elif obj.name.startswith('#XFBIN Textures'):
+                tex_obj = bpy.data.objects.new(f'#XFBIN Textures [{collection.name}_f]', None)
+                tex_obj.empty_display_type = obj.empty_display_type
+                tex_obj.empty_display_size = obj.empty_display_size
+                #link the object
+                new_col.objects.link(tex_obj)
+                
+                for tex in obj.xfbin_texture_chunks_data.texture_chunks:
+                    t = tex_obj.xfbin_texture_chunks_data.texture_chunks.add()
+                    t.texture_name = tex.texture_name
+                    t.path = tex.path
+            
+            #Armature object
+            elif obj.type == 'ARMATURE':
+                #create a new object with the armature data
+                data = obj.data.copy()
+                
+                arm_obj = bpy.data.objects.new(f'{obj.name[:-4]}_f [C]', data)
+                arm_obj.data.name = arm_obj.name
+                arm_obj.show_in_front = True
+                
+                #link the objects
+                new_col.objects.link(arm_obj)
+                
+                #flip bones
+                if colprop.FlipMeshes:
+                
+                    sfx_pfx = ('l ', 'r ', ' l', ' r', 'l_', 'r_', '_l', '_r')
+                    
+                    bpy.context.view_layer.objects.active = arm_obj
+                    bpy.ops.object.editmode_toggle()
+                    bpy.ops.armature.select_all(action='DESELECT')
+                    for bone in arm_obj.data.edit_bones:
+                        if not any(x in bone.name for x in sfx_pfx) and bone.head.x > 0.01 or not any(x in bone.name for x in sfx_pfx) and bone.head.x < -0.01:
+                            bone.head.x *= -1
+                            bone.tail.x *= -1
+                    bpy.ops.object.editmode_toggle()
+
+                #copy props
+                bpy.context.view_layer.objects.active = obj
+                bpy.ops.xfbin_panel.copy_group(prop_path='xfbin_clump_data', prop_name='Xfbin Clump Data')
+                
+                bpy.context.view_layer.objects.active = arm_obj
+                bpy.ops.xfbin_panel.paste_group(prop_path='xfbin_clump_data', prop_name='Xfbin Clump Data')
+
+                arm_obj.xfbin_clump_data.path = obj.xfbin_clump_data.path[:-4] + '_f.max'
+                
+                #model group
+                model_group = arm_obj.xfbin_clump_data.model_groups[0]
+                
+                #clear stuff
+                arm_obj.xfbin_clump_data.models.clear()
+                model_group.models.clear()
+                
+                
+                for empty in obj.children:
+                    new_empty = bpy.data.objects.new(f'{empty.name}_f', None)
+                    new_empty.empty_display_type = empty.empty_display_type
+                    new_empty.empty_display_size = empty.empty_display_size
+                    
+                    #link the object
+                    new_col.objects.link(new_empty)
+                    
+                    #copy props
+                    bpy.context.view_layer.objects.active = empty
+                    bpy.ops.xfbin_panel.copy_group(prop_path='xfbin_nud_data', prop_name='Xfbin Nud Data')
+                    
+                    #paste props
+                    bpy.context.view_layer.objects.active = new_empty
+                    bpy.ops.xfbin_panel.paste_group(prop_path='xfbin_nud_data', prop_name='Xfbin Nud Data')
+                    
+                    #set the parent
+                    new_empty.parent = arm_obj
+                    new_empty.parent_type = empty.parent_type
+                    if new_empty.parent_type == 'BONE':
+                        new_empty.parent_bone = empty.parent_bone
+                    
+                    #set mesh bone
+                    new_empty.xfbin_nud_data.mesh_bone = f'{empty.xfbin_nud_data.mesh_bone}_f'
+                    
+                    #add empties to models list
+                    model = arm_obj.xfbin_clump_data.models.add()
+                    model.empty = new_empty
+                    
+                    model2 = model_group.models.add()
+                    model2.empty = new_empty
+                    
+                    
+                    for mesh_obj in empty.children:
+                        new_mesh = mesh_obj.data.copy()
+                        new_mesh.name = mesh_obj.data.name + '_f'
+                        
+                        new_obj = bpy.data.objects.new(f'{mesh_obj.name}_f', new_mesh)
+                        #link the object
+                        new_col.objects.link(new_obj)
+                        #set the parent
+                        new_obj.parent = new_empty
+                        
+                        #add armature modifier
+                        mod = new_obj.modifiers.new(arm_obj.name, 'ARMATURE')
+                        mod.object = arm_obj
+                        
+                        #copy props
+                        bpy.context.view_layer.objects.active = mesh_obj
+                        bpy.ops.xfbin_panel.copy_group(prop_path='xfbin_mesh_data', prop_name='Xfbin Mesh Data')
+                        
+                        #paste props
+                        bpy.context.view_layer.objects.active = new_obj
+                        bpy.ops.xfbin_panel.paste_group(prop_path='xfbin_mesh_data', prop_name='Xfbin Mesh Data')
+                        
+                        #correct the culling settings
+                        new_obj.xfbin_mesh_data.materials[0].cull_mode = 0
+                        
+                        if colprop.FlipMeshes == True:
+                            #mirror active object
+                            bpy.ops.object.select_all(action='DESELECT')
+                            new_obj.select_set(True)
+                            new_obj.scale[0] = new_obj.scale[0] * -1
+                            bpy.ops.object.editmode_toggle()
+                            bpy.ops.mesh.select_all(action='SELECT')
+                            bpy.ops.mesh.flip_normals()
+                            bpy.ops.object.editmode_toggle()
+                            bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+
+                            #mirror vertex groups
+                            
+                            sfx_pfx_dict = {
+                                            'l ':'Left ',
+                                            'r ':'Right ',
+                                            '_l':'_Left',
+                                            '_r':'_Right',
+                                            }
+
+                            
+                            for v in new_obj.vertex_groups:
+                                if v.name[:2] in sfx_pfx_dict:
+                                    v.name = sfx_pfx_dict[v.name[:2]] + v.name[2:]
+                                elif v.name[-2:] in sfx_pfx_dict:
+                                    v.name = v.name[:-2] + sfx_pfx_dict[v.name[-2:]]
+                                
+                            for v in new_obj.vertex_groups:
+                                if v.name.startswith('Left '):
+                                    v.name = f'r {v.name[5:]}'
+                                elif v.name.startswith('Right '):
+                                    v.name = f'l {v.name[6:]}'
+                                elif v.name.endswith('_Left'):
+                                    v.name = f'{v.name[:-5]}_r'
+                                elif v.name.endswith('_Right'):
+                                    v.name = f'{v.name[:-6]}_l'
+                            
+                for b in arm_obj.data.bones:
+                    if b.name != obj.data.bones[1].name:
+                        b.name = f'{b.name}_f'
+
+        bpy.ops.object.add_char_code()
+
+        colprop.collections = collection.name + '_f'
+
+        bpy.ops.object.add_char_code()
 
 
         return {'FINISHED'}
@@ -1384,7 +1591,7 @@ class CreateBoneList(bpy.types.Operator):
 class ExportDict(bpy.types.Operator, ExportHelper):
     bl_idname = "object.export_dict"
     bl_label = "Export Bones Dict"
-    bl_description = "Export your custom naming schemes"
+    bl_description = "Export your bone dictionary to a json file"
 
     filename_ext = ".json"
     filter_glob: bpy.props.StringProperty(default='*.json;', options={'HIDDEN'})
@@ -1400,4 +1607,88 @@ class ExportDict(bpy.types.Operator, ExportHelper):
             json.dump(bone_dictionary, f, indent=4)
         
         self.report({'INFO'}, "Saved bone dictionary to " + self.filepath)
+        return {'FINISHED'}
+
+class RemakeShaders(bpy.types.Operator):
+    bl_idname = "object.remake_shaders"
+    bl_label = "Remake XFBIN Shaders"
+    bl_description = 'Delete the current shaders and remake them, this is useful for when you import a texture file'
+    @classmethod
+    def poll(cls, context):
+        return bpy.context.mode == 'OBJECT'
+    
+    def execute(self, context):
+        #Shader functions
+        shaders_dict = {'00 00 F0 0A': F00A, '00 01 F0 0A': F00A, '00 02 F0 0A': _02_F00A, '00 05 F0 0D': _05_F00D,
+        '00 01 F0 0D': _05_F00D, '00 01 F0 03': _01_F003, '00 05 F0 03': _01_F003, '00 05 F0 02': _05_F002, '00 07 F0 02':_07_F002,
+        '00 00 E0 02': E002, '00 07 F0 10':_07_F010, '00 03 F0 10':_07_F010, '00 07 F0 0D':_07_F00D, '00 01 F0 02':_01_F002,
+        '00 01 F0 08':_01_F008, '00 01 F0 0F':_01_F00F, '00 03 F0 0F':_03_F00F}
+        objects = [o for o in context.object.users_collection[0].objects if o.type == 'MESH']
+        for o in objects:
+            parent = o.parent.parent
+            xfbin_mat = parent.xfbin_clump_data.materials[o.xfbin_mesh_data.xfbin_material]
+            if f'[XFBIN] {xfbin_mat.name}' in bpy.data.materials:
+                bpy.data.materials.remove(bpy.data.materials.get(f'[XFBIN] {xfbin_mat.name}'))
+
+
+        for o in objects:
+            parent = o.parent.parent
+            if o.xfbin_mesh_data.materials[0].name in shaders_dict:
+                meshmat = o.xfbin_mesh_data.materials[0]
+                xfbin_mat = parent.xfbin_clump_data.materials[o.xfbin_mesh_data.xfbin_material]
+                if f'[XFBIN] {xfbin_mat.name}' not in bpy.data.materials:
+                    material = shaders_dict.get(o.xfbin_mesh_data.materials[0].name)(self, meshmat, xfbin_mat, f'[XFBIN] {xfbin_mat.name}', xfbin_mat.name)
+                    o.material_slots[0].material = material
+                else:
+                    o.material_slots[0].material = bpy.data.materials[f'[XFBIN] {xfbin_mat.name}']
+            else:
+                xfbin_mat = parent.xfbin_clump_data.materials[o.xfbin_mesh_data.xfbin_material]
+
+                material = bpy.data.materials.new(f'[XFBIN] {xfbin_mat.name}')
+                material.use_nodes = True
+                material.blend_method = 'CLIP'
+                material.shadow_method = 'CLIP'
+
+                #remove node groups with the same name to prevent issues with min and max values of some nodes
+                if bpy.data.node_groups.get(xfbin_mat.name):
+                    bpy.data.node_groups.remove(bpy.data.node_groups.get(xfbin_mat.name))
+                
+
+                if xfbin_mat.texture_groups and xfbin_mat.texture_groups[0].textures:
+                    #texcount = len(xfbin_mat.texture_groups[0].textures)
+                    not_included = ['celshade', 'haching', 'haching1', 'haching2', 'haching_n', '1efc_pro_noise01']
+                    prev_index = 0
+                    for i in range(len(xfbin_mat.texture_groups[0].textures)):
+                        if i == 0:
+                            globals()[f'image_name_{i}'] = xfbin_mat.texture_groups[0].textures[i].texture
+                            globals()[f'uv_{i}'] = material.node_tree.nodes.new('ShaderNodeUVMap')
+                            globals()[f'uv_{i}'].uv_map = f'UV_{i}'
+                            globals()[f'tex_{i}'] = material.node_tree.nodes.new('ShaderNodeTexImage')
+                            globals()[f'tex_{i}'].name = f'Texture_{i}'
+                            globals()[f'tex_{i}'].image = bpy.data.images.get(globals()[f'image_name_{i}'])
+                            material.node_tree.links.new(globals()[f'uv_{i}'].outputs[0], globals()[f'tex_{i}'].inputs[0])
+                            pBSDF = material.node_tree.nodes.get('Principled BSDF')
+                            material.node_tree.links.new(globals()[f'tex_{i}'].outputs[0], pBSDF.inputs['Base Color'])
+                            material.node_tree.links.new(globals()[f'tex_{i}'].outputs[1], pBSDF.inputs['Alpha'])
+                            prev_index = i
+                            print(prev_index)
+                        if i > 0 and xfbin_mat.texture_groups[0].textures[i].texture_name not in not_included:
+                            globals()[f'image_name_{i}'] = xfbin_mat.texture_groups[0].textures[i].texture
+                            globals()[f'uv_{i}'] = material.node_tree.nodes.new('ShaderNodeUVMap')
+                            globals()[f'uv_{i}'].uv_map = f'UV_{i}'
+                            globals()[f'tex_{i}'] = material.node_tree.nodes.new('ShaderNodeTexImage')
+                            globals()[f'tex_{i}'].name = f'Texture_{i}'
+                            globals()[f'tex_{i}'].image = bpy.data.images.get(globals()[f'image_name_{i}'])
+                            globals()[f'mix_{i}'] = material.node_tree.nodes.new('ShaderNodeMixRGB')
+                            globals()[f'mix_{i}'].blend_type = 'MIX'
+                            globals()[f'mix_{i}'].inputs[0].default_value = 1
+                            material.node_tree.links.new(globals()[f'uv_{i}'].outputs[0], globals()[f'tex_{i}'].inputs[0])
+                            material.node_tree.links.new(globals()[f'tex_{i}'].outputs[1], globals()[f'mix_{i}'].inputs[0])
+                            material.node_tree.links.new(globals()[f'tex_{prev_index}'].outputs[0], globals()[f'mix_{i}'].inputs[1])
+                            material.node_tree.links.new(globals()[f'tex_{i}'].outputs[0], globals()[f'mix_{i}'].inputs[2])
+                            material.node_tree.links.new(globals()[f'mix_{i}'].outputs[0], pBSDF.inputs['Base Color'])
+                            prev_index += 1
+                            print(prev_index)
+                o.material_slots[0].material = material
+            
         return {'FINISHED'}

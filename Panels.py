@@ -98,6 +98,7 @@ class Panel_Material(Panel):
         layout.operator("object.replace_mats")
         layout.prop(colprop, 'XFBIN_Mat')
         layout.operator("object.duplicate_mats")
+        layout.operator("object.remake_shaders")
 
 class Panel_Swap(Panel):
     bl_space_type = "VIEW_3D"
@@ -138,6 +139,13 @@ class Panel_Swap(Panel):
         col.operator('object.clone')
         col.prop(colprop, 'BodID')
         col.prop(colprop, 'CloneID')
+        row = layout.row() 
+        row.label(text= 'For Jojo models only')
+        row = layout.row() 
+        col = layout.column_flow(columns=2, align=True)
+        col.operator('object.bod1f')
+        col.prop(colprop, 'FlipMeshes')
+
 
 class Panel_misc(Panel):
     bl_space_type = "VIEW_3D"
@@ -344,4 +352,9 @@ class ColProperty(PropertyGroup):
     TexMat: BoolProperty(
     name = 'Edit Texture and Material Paths',
     description = ''
+    )
+
+    FlipMeshes: BoolProperty(
+    name = 'Flip Meshes',
+    description = 'Flip meshes when creating the bod1_f model'
     )
