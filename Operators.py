@@ -1397,6 +1397,21 @@ class Create_bod1_f(Operator):
                 path = obj.xfbin_dynamics_data.path
                 dyn_obj.xfbin_dynamics_data.clump_name = obj.xfbin_dynamics_data.clump_name + '_f'
                 dyn_obj.xfbin_dynamics_data.path = f'{obj.xfbin_dynamics_data.path[:-(len(clump_name) + 4)]}{clump_name}_f.max'
+                
+                spg = dyn_obj.xfbin_dynamics_data.spring_groups
+                for i in (range(len(spg))):
+                    print(spg[i].name)
+                    spg[i].bone_spring += '_f'
+                    spg[i].name = f'Spring Group [{spg[i].bone_spring}]'
+                
+                col = dyn_obj.xfbin_dynamics_data.collision_spheres
+                for i in range(len((col))):
+                    col[i].bone_collision += '_f'
+                    col[i].name = f'Collision Sphere {i} [{col[i].bone_collision}]'
+                    if col[i].attach_groups:
+                        for spring in col[i].attached_groups:
+                            spring.value = f'{spring.value[:-1]}_f]'
+
             
             #Textures object
             elif obj.name.startswith('#XFBIN Textures'):
