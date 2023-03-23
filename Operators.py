@@ -1,3 +1,4 @@
+import collections
 import bpy, json, os
 from bpy.props import EnumProperty, BoolProperty, StringProperty, FloatVectorProperty
 from bpy.types import (Operator)
@@ -281,12 +282,6 @@ class AddCharCode(Operator):
             elif bone.name[0:nl] != char_id and bone.name:
                 self.report({'INFO'}, f"ID:({char_id}) added to ({bone.name})")
                 bone.name = char_id + ' ' + bone.name
-                
-        #re-sets armatures modifier object to fix a bug in blender 3.0
-        '''for obj in bpy.data.objects[colprop.armatures].children_recursive:
-            if obj.type == 'MESH':
-                mod = [m for m in obj.modifiers if m.type == 'ARMATURE']
-                mod[0].object = bpy.data.objects[colprop.armatures]'''
         
         return {'FINISHED'}
 
@@ -1269,7 +1264,11 @@ class Copy_Bone_Pos(Operator):
         # Move bones from base armature to the positions of bones from target armature
         for b in armature_obj.data.edit_bones:
             if b.name in btoc:
+                '''armature_obj.data.edit_bones[b.name].head.xyz = armature_obj.data.edit_bones[b.name + '.001'].head.xyz
+                armature_obj.data.edit_bones[b.name].tail.xz = armature_obj.data.edit_bones[b.name + '.001'].head.xz
+                armature_obj.data.edit_bones[b.name].tail.y = armature_obj.data.edit_bones[b.name + '.001'].head.y + 0.0001'''
                 armature_obj.data.edit_bones[b.name].matrix = armature_obj.data.edit_bones[b.name + '.001'].matrix
+                
         # Delete duplicate bones
             if b.name.endswith('.001'):
                 b.select_head = True
@@ -1317,6 +1316,29 @@ class CreateClone(Operator):
                         b.name = bpy.data.objects[o.name].data.bones[1].name + b.name[8:]
                 o.name = bpy.data.objects[o.name].data.bones[1].name[:-4] + colprop.BodID + ' [C]'
         
+        #dynamics
+        if bpy.data.objects.get(f'#XFBIN Dynamics [{colprop.collections}]'):
+            obj = bpy.data.objects[f'#XFBIN Dynamics [{colprop.collections}]']
+            dyn_obj = bpy.data.objects.new(f'#XFBIN Dynamics [{colprop.collections[:-4]}{colprop.BodID}]', None)
+            dyn_obj.empty_display_type = obj.empty_display_type
+            dyn_obj.empty_display_size = obj.empty_display_size
+            #link the object
+            bpy.data.collections[colprop.collections].objects.link(dyn_obj)
+
+            #copy props from old object
+            bpy.context.view_layer.objects.active = obj
+            bpy.ops.xfbin_panel.copy_group(prop_path='xfbin_dynamics_data', prop_name='Dynamics Properties')
+            
+            #paste props to the new object
+            bpy.context.view_layer.objects.active = dyn_obj
+            bpy.ops.xfbin_panel.paste_group(prop_path='xfbin_dynamics_data', prop_name='Dynamics Properties')
+            
+            #correct clump name and path
+            clump_name = obj.xfbin_dynamics_data.clump_name
+            path = obj.xfbin_dynamics_data.path
+            dyn_obj.xfbin_dynamics_data.clump_name = obj.xfbin_dynamics_data.clump_name[:-4] + colprop.BodID
+            dyn_obj.xfbin_dynamics_data.path = f'{obj.xfbin_dynamics_data.path[:-8]}{colprop.BodID}.max'
+
         #delete .001, .002 etc... to ensure no errors happen
         bpy.ops.object.fix_names()
 
@@ -1439,7 +1461,7 @@ class Create_bod1_f(Operator):
                 new_col.objects.link(arm_obj)
                 
                 #flip bones
-                if colprop.FlipMeshes:
+                if colprop.FlipBones:
                 
                     sfx_pfx = ('l ', 'r ', ' l', ' r', 'l_', 'r_', '_l', '_r')
                     
@@ -1563,9 +1585,12 @@ class Create_bod1_f(Operator):
                                     v.name = f'{v.name[:-5]}_r'
                                 elif v.name.endswith('_Right'):
                                     v.name = f'{v.name[:-6]}_l'
-                            
-                for b in arm_obj.data.bones:
-                    if b.name != obj.data.bones[1].name:
+                if len(arm_obj.data.bones) > 2:
+                    for b in arm_obj.data.bones:
+                        if b.name != obj.data.bones[1].name:
+                            b.name = f'{b.name}_f'
+                else:
+                    for b in arm_obj.data.bones:
                         b.name = f'{b.name}_f'
 
         bpy.ops.object.add_char_code()
@@ -1576,6 +1601,369 @@ class Create_bod1_f(Operator):
 
 
         return {'FINISHED'}
+
+class ToDmgBody(Operator):
+    bl_idname = "object.reg_bod"
+    bl_label = "Regular to DMG" 
+    bl_description = ('Creates a damage body from the selected model.')
+    
+    @classmethod
+    def poll(cls, context):
+        if bpy.context.mode == 'OBJECT' and bpy.context.scene.col_prop.collections != "":
+            return True
+        else:
+            return False
+        
+    def execute(self, context):
+        
+        colprop = bpy.context.scene.col_prop
+
+        armature = bpy.data.objects[colprop.armatures]
+
+        old_col = bpy.data.collections[colprop.collections]
+
+        new_col = bpy.data.collections.new(f'{armature.name[:-4]}_dmg01')
+
+        bpy.context.collection.children.link(new_col)
+
+        bpy.ops.object.remove_char_code()
+
+        newarm = armature.data.copy()
+        armobj = bpy.data.objects.new(f'{armature.name[:-8]}dmg01_{armature.name[4:8]} [C]', newarm)
+        armobj.show_in_front = True
+        armobj.data.name = armobj.name
+        new_col.objects.link(armobj)
+        armobj.data.bones[1].name = f"{armature.data.bones[1].name[:4]}dmg01_{armature.data.bones[1].name[4:]}"
+        armobj['xfbin_clump'] = 1
+
+        colprop.collections = new_col.name
+        colprop.armatures = armobj.name
+
+        bpy.context.view_layer.objects.active = armature
+        bpy.ops.xfbin_panel.copy_group(prop_path='xfbin_clump_data', prop_name='Xfbin Clump Data')
+
+        bpy.context.view_layer.objects.active = armobj
+        bpy.ops.xfbin_panel.paste_group(prop_path='xfbin_clump_data', prop_name='Xfbin Clump Data')
+
+        bpy.ops.object.add_char_code()
+
+        armobj.xfbin_clump_data.path = f"{armature.xfbin_clump_data.path[:-12]}{armobj.name[:-4]}.max"
+
+        for mat in armobj.xfbin_clump_data.materials:
+            mat.name = f"{mat.name[:4]}dmg01_{mat.name[4:]}"
+            mat.material_name = f"{mat.material_name[:4]}dmg01_{mat.material_name[4:]}"
+
+        #Dynamics object
+        old_dyn = old_col.objects.get(f'#XFBIN Dynamics [{armature.name[:-4]}]')
+
+        if old_dyn:
+            #create the object
+            dyn_obj = bpy.data.objects.new(f'#XFBIN Dynamics [{armobj.name[:-4]}]', None)
+            dyn_obj.empty_display_type = old_dyn.empty_display_type
+            dyn_obj.empty_display_size = old_dyn.empty_display_size
+            #link the object
+            new_col.objects.link(dyn_obj)
+            
+            #copy props from old object
+            bpy.context.view_layer.objects.active = old_dyn
+            bpy.ops.xfbin_panel.copy_group(prop_path='xfbin_dynamics_data', prop_name='Dynamics Properties')
+            
+            #paste props to the new object
+            bpy.context.view_layer.objects.active = dyn_obj
+            bpy.ops.xfbin_panel.paste_group(prop_path='xfbin_dynamics_data', prop_name='Dynamics Properties')
+            
+            #correct clump name and path
+            dyn_obj.xfbin_dynamics_data.clump_name = armobj.name[:-4]
+            dyn_obj.xfbin_dynamics_data.path = armobj.xfbin_clump_data.path
+            
+            spg = dyn_obj.xfbin_dynamics_data.spring_groups
+            for i in (range(len(spg))):
+                spg[i].bone_spring = f'{armobj.data.bones[1].name}{spg[i].bone_spring[8:]}'
+                spg[i].name = f'Spring Group [{spg[i].bone_spring}]'
+            
+            col = dyn_obj.xfbin_dynamics_data.collision_spheres
+            for i in range(len((col))):
+                col[i].bone_collision = f'{armobj.data.bones[1].name}{col[i].bone_collision[8:]}'
+                col[i].name = f'Collision Sphere {i} [{col[i].bone_collision}]'
+                if col[i].attach_groups:
+                    for spring in col[i].attached_groups:
+                        start_index = spring.value.find('[')
+                        bone = spring.value[start_index+1:-1]
+                        new_bone = f"{armobj.data.bones[1].name}{bone[8:]}"
+                        spring.value = f'Spring Group [{new_bone}]'
+            
+        #textures
+        old_tex = old_col.objects.get(f'#XFBIN Textures [{old_col.name}]')
+        if old_tex:
+            tex_obj = bpy.data.objects.new(f'#XFBIN Textures [{new_col.name}]', None)
+            tex_obj.empty_display_type = old_tex.empty_display_type
+            tex_obj.empty_display_size = old_tex.empty_display_size
+            #link the object
+            new_col.objects.link(tex_obj)
+            
+            for tex in old_tex.xfbin_texture_chunks_data.texture_chunks:
+                t = tex_obj.xfbin_texture_chunks_data.texture_chunks.add()
+                t.texture_name = tex.texture_name
+                t.path = tex.path
+        
+        #model group
+        model_group = armobj.xfbin_clump_data.model_groups[0]
+        
+        #clear stuff
+        armobj.xfbin_clump_data.models.clear()
+        model_group.models.clear()
+        exclude = ["asianimel", "asianimer", "udeanml", "udeanmr"]
+        for empty in armature.children:
+           
+
+            if any(x in empty.name for x in exclude):
+                new_empty = bpy.data.objects.new(f'{empty.name}', None)
+            else:
+                new_empty = bpy.data.objects.new(f'{armobj.data.bones[1].name}{empty.name[8:]}', None)
+            new_empty.empty_display_type = empty.empty_display_type
+            new_empty.empty_display_size = empty.empty_display_size
+            
+            #link the object
+            new_col.objects.link(new_empty)
+            
+            #copy props
+            bpy.context.view_layer.objects.active = empty
+            bpy.ops.xfbin_panel.copy_group(prop_path='xfbin_nud_data', prop_name='Xfbin Nud Data')
+            
+            #paste props
+            bpy.context.view_layer.objects.active = new_empty
+            bpy.ops.xfbin_panel.paste_group(prop_path='xfbin_nud_data', prop_name='Xfbin Nud Data')
+            
+            #set the parent
+            new_empty.parent = armobj
+            new_empty.parent_type = empty.parent_type
+            if new_empty.parent_type == 'BONE':
+                new_empty.parent_bone = empty.parent_bone
+            
+            #set mesh bone
+            new_empty.xfbin_nud_data.mesh_bone = f'{armobj.data.bones[1].name}{empty.xfbin_nud_data.mesh_bone[8:]}'
+            
+            #add empties to models list
+            model = armobj.xfbin_clump_data.models.add()
+            model.empty = new_empty
+            
+            model2 = model_group.models.add()
+            model2.empty = new_empty
+            
+            
+            for mesh_obj in empty.children:
+                new_mesh = mesh_obj.data.copy()
+                new_mesh.name = f"{armobj.data.bones[1].name}{mesh_obj.data.name[8:]}"
+                
+                new_obj = bpy.data.objects.new(f'{armobj.data.bones[1].name}{mesh_obj.name[8:]}', new_mesh)
+                #link the object
+                new_col.objects.link(new_obj)
+                #set the parent
+                new_obj.parent = new_empty
+                
+                #add armature modifier
+                mod = new_obj.modifiers.new(armobj.name, 'ARMATURE')
+                mod.object = armobj
+                
+                #copy props
+                bpy.context.view_layer.objects.active = mesh_obj
+                bpy.ops.xfbin_panel.copy_group(prop_path='xfbin_mesh_data', prop_name='Xfbin Mesh Data')
+                
+                #paste props
+                bpy.context.view_layer.objects.active = new_obj
+                bpy.ops.xfbin_panel.paste_group(prop_path='xfbin_mesh_data', prop_name='Xfbin Mesh Data')
+
+                new_obj.xfbin_mesh_data.xfbin_material = f"{mesh_obj.xfbin_mesh_data.xfbin_material[:4]}dmg01_{mesh_obj.xfbin_mesh_data.xfbin_material[4:]}"
+            
+            bpy.ops.object.remove_char_code()
+            bpy.ops.object.add_char_code()
+                
+
+
+        return {'FINISHED'}
+
+
+class ToRegularBody(Operator):
+    bl_idname = "object.dmg_bod"
+    bl_label = "DMG to Regular" 
+    bl_description = ('Converts models that end with _dmg01 to a regular one.')
+    
+    @classmethod
+    def poll(cls, context):
+        if bpy.context.mode == 'OBJECT' and bpy.context.scene.col_prop.collections != "":
+            return True
+        else:
+            return False
+        
+    def execute(self, context):
+        
+        colprop = bpy.context.scene.col_prop
+
+        armature = bpy.data.objects[colprop.armatures]
+
+        bpy.ops.object.remove_char_code()
+
+        old_col = bpy.data.collections[colprop.collections]
+
+        new_col = bpy.data.collections.new(f'{armature.name[:4]}{armature.name[10:-4]}')
+
+        bpy.context.collection.children.link(new_col)
+
+        newarm = armature.data.copy()
+        armobj = bpy.data.objects.new(f'{armature.name[:4]}{armature.name[10:]}', newarm)
+        armobj.show_in_front = True
+        armobj.data.name = armobj.name
+        new_col.objects.link(armobj)
+        armobj.data.bones[1].name = f"{armature.data.bones[1].name[:4]}{armature.data.bones[1].name[-4:]}"
+        armobj['xfbin_clump'] = 1
+
+        colprop.collections = new_col.name
+        colprop.armatures = armobj.name
+
+        bpy.context.view_layer.objects.active = armature
+        bpy.ops.xfbin_panel.copy_group(prop_path='xfbin_clump_data', prop_name='Xfbin Clump Data')
+
+        bpy.context.view_layer.objects.active = armobj
+        bpy.ops.xfbin_panel.paste_group(prop_path='xfbin_clump_data', prop_name='Xfbin Clump Data')
+
+        bpy.ops.object.add_char_code()
+
+        #armobj.xfbin_clump_data.path = f"{armature.xfbin_clump_data.path[:-12]}{armobj.name[:-4]}.max"
+        armobj.xfbin_clump_data.path = f"{armature.xfbin_clump_data.path[:-18]}{armobj.name[:-4]}.max"
+
+        for mat in armobj.xfbin_clump_data.materials:
+            mat.name = f'{armobj.name[:4]}{mat.name[9:]}'
+            mat.material_name = f'{armobj.name[:4]}{mat.material_name[10:]}'
+
+        #Dynamics object
+        old_dyn = old_col.objects.get(f'#XFBIN Dynamics [{armature.name[:-4]}]')
+
+        if old_dyn:
+            #create the object
+            dyn_obj = bpy.data.objects.new(f'#XFBIN Dynamics [{armobj.name[:-4]}]', None)
+            dyn_obj.empty_display_type = old_dyn.empty_display_type
+            dyn_obj.empty_display_size = old_dyn.empty_display_size
+            #link the object
+            new_col.objects.link(dyn_obj)
+            
+            #copy props from old object
+            bpy.context.view_layer.objects.active = old_dyn
+            bpy.ops.xfbin_panel.copy_group(prop_path='xfbin_dynamics_data', prop_name='Dynamics Properties')
+            
+            #paste props to the new object
+            bpy.context.view_layer.objects.active = dyn_obj
+            bpy.ops.xfbin_panel.paste_group(prop_path='xfbin_dynamics_data', prop_name='Dynamics Properties')
+            
+            #correct clump name and path
+            dyn_obj.xfbin_dynamics_data.clump_name = armobj.name[:-4]
+            dyn_obj.xfbin_dynamics_data.path = armobj.xfbin_clump_data.path
+            
+            spg = dyn_obj.xfbin_dynamics_data.spring_groups
+            for i in (range(len(spg))):
+                spg[i].bone_spring = f'{armobj.data.bones[1].name}{spg[i].bone_spring[14:]}'
+                spg[i].name = f'Spring Group [{spg[i].bone_spring}]'
+            
+            col = dyn_obj.xfbin_dynamics_data.collision_spheres
+            for i in range(len((col))):
+                col[i].bone_collision = f'{armobj.data.bones[1].name}{col[i].bone_collision[14:]}'
+                col[i].name = f'Collision Sphere {i} [{col[i].bone_collision}]'
+                if col[i].attach_groups:
+                    for spring in col[i].attached_groups:
+                        start_index = spring.value.find('[')
+                        bone = spring.value[start_index+1:-1]
+                        new_bone = f"{armobj.data.bones[1].name}{bone[14:]}"
+                        spring.value = f'Spring Group [{new_bone}]'
+            
+        #textures
+        old_tex = old_col.objects.get(f'#XFBIN Textures [{old_col.name}]')
+        if old_tex:
+            tex_obj = bpy.data.objects.new(f'#XFBIN Textures [{new_col.name}]', None)
+            tex_obj.empty_display_type = old_tex.empty_display_type
+            tex_obj.empty_display_size = old_tex.empty_display_size
+            #link the object
+            new_col.objects.link(tex_obj)
+            
+            for tex in old_tex.xfbin_texture_chunks_data.texture_chunks:
+                t = tex_obj.xfbin_texture_chunks_data.texture_chunks.add()
+                t.texture_name = tex.texture_name
+                t.path = tex.path
+        
+        #model group
+        model_group = armobj.xfbin_clump_data.model_groups[0]
+        
+        #clear stuff
+        armobj.xfbin_clump_data.models.clear()
+        model_group.models.clear()
+        exclude = ["asianimel", "asianimer", "udeanml", "udeanmr"]
+        for empty in armature.children:
+           
+
+            if any(x in empty.name for x in exclude):
+                new_empty = bpy.data.objects.new(f'{empty.name}', None)
+            else:
+                new_empty = bpy.data.objects.new(f'{armobj.data.bones[1].name}{empty.name[14:]}', None)
+            new_empty.empty_display_type = empty.empty_display_type
+            new_empty.empty_display_size = empty.empty_display_size
+            
+            #link the object
+            new_col.objects.link(new_empty)
+            
+            #copy props
+            bpy.context.view_layer.objects.active = empty
+            bpy.ops.xfbin_panel.copy_group(prop_path='xfbin_nud_data', prop_name='Xfbin Nud Data')
+            
+            #paste props
+            bpy.context.view_layer.objects.active = new_empty
+            bpy.ops.xfbin_panel.paste_group(prop_path='xfbin_nud_data', prop_name='Xfbin Nud Data')
+            
+            #set the parent
+            new_empty.parent = armobj
+            new_empty.parent_type = empty.parent_type
+            if new_empty.parent_type == 'BONE':
+                new_empty.parent_bone = empty.parent_bone
+            
+            #set mesh bone
+            new_empty.xfbin_nud_data.mesh_bone = f'{armobj.data.bones[1].name}{empty.xfbin_nud_data.mesh_bone[14:]}'
+            
+            #add empties to models list
+            model = armobj.xfbin_clump_data.models.add()
+            model.empty = new_empty
+            
+            model2 = model_group.models.add()
+            model2.empty = new_empty
+            
+            
+            for mesh_obj in empty.children:
+                new_mesh = mesh_obj.data.copy()
+                new_mesh.name = f"{armobj.data.bones[1].name}{mesh_obj.data.name[14:]}"
+                
+                new_obj = bpy.data.objects.new(f'{armobj.data.bones[1].name}{mesh_obj.name[14:]}', new_mesh)
+                #link the object
+                new_col.objects.link(new_obj)
+                #set the parent
+                new_obj.parent = new_empty
+                
+                #add armature modifier
+                mod = new_obj.modifiers.new(armobj.name, 'ARMATURE')
+                mod.object = armobj
+                
+                #copy props
+                bpy.context.view_layer.objects.active = mesh_obj
+                bpy.ops.xfbin_panel.copy_group(prop_path='xfbin_mesh_data', prop_name='Xfbin Mesh Data')
+                
+                #paste props
+                bpy.context.view_layer.objects.active = new_obj
+                bpy.ops.xfbin_panel.paste_group(prop_path='xfbin_mesh_data', prop_name='Xfbin Mesh Data')
+
+                new_obj.xfbin_mesh_data.xfbin_material = f"{mesh_obj.xfbin_mesh_data.xfbin_material[:4]}{mesh_obj.xfbin_mesh_data.xfbin_material[10:]}"
+            
+            bpy.ops.object.remove_char_code()
+            bpy.ops.object.add_char_code()
+                
+
+
+        return {'FINISHED'}
+
 
 class CreateBoneList(bpy.types.Operator):
     bl_idname = "object.build_bone_list"

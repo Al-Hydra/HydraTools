@@ -29,14 +29,14 @@ from . Operators import (RemoveLOD, AddVertColors, RemoveVertColors,
     PaintVertexColors, ApplyRestPose, RemoveCharCode, RenameBones, AddCharCode,
     StormIK, FixNames, ArmatureModifier, Swap_Character_Code,Replace_Mats,
     Duplicate_XFBIN_Mat, Copy_Bone_Pos, CreateClone, CreateBoneList, ExportDict,
-    RemakeShaders, Create_bod1_f)
+    RemakeShaders, Create_bod1_f, ToDmgBody,ToRegularBody)
 
 classes = (Panel_Main, Panel_Armature, Panel_Material, Panel_misc, Panel_Swap,Panel_dict,
     RemoveLOD, ColProperty, AddVertColors, RemoveVertColors,PaintVertexColors,
     ApplyRestPose, RemoveCharCode, RenameBones, AddCharCode, StormIK, FixNames,
     ArmatureModifier, Swap_Character_Code,Replace_Mats, Duplicate_XFBIN_Mat,
     Copy_Bone_Pos, CreateClone, BoneList, CreateBoneList, DICT_UL_BoneList, ExportDict,
-    RemakeShaders, Create_bod1_f)
+    RemakeShaders, Create_bod1_f, ToDmgBody,ToRegularBody)
 
 def search_armature(self, object):
     colprop = bpy.context.scene.col_prop

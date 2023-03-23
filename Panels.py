@@ -140,11 +140,18 @@ class Panel_Swap(Panel):
         col.prop(colprop, 'BodID')
         col.prop(colprop, 'CloneID')
         row = layout.row() 
+        row.operator('object.dmg_bod')
+        row = layout.row()
+        row.operator("object.reg_bod")
+        row = layout.row() 
         row.label(text= 'For Jojo models only')
         row = layout.row() 
         col = layout.column_flow(columns=2, align=True)
-        col.operator('object.bod1f')
         col.prop(colprop, 'FlipMeshes')
+        col.prop(colprop, 'FlipBones')
+        row = layout.row()
+        row.operator('object.bod1f')
+        
 
 
 class Panel_misc(Panel):
@@ -207,7 +214,7 @@ class Panel_dict(Panel):
         row.operator('object.build_bone_list')
         col.prop_search(scene, 'main_armature', bpy.data, 'objects', text= 'Base')
         col.prop_search(scene, 'target_armature', bpy.data, 'objects', text= 'Target')
-
+        
         obj = context.object
         box = layout.box()
         box.label(text = 'Dictionary:')
@@ -238,6 +245,10 @@ class DICT_UL_BoneList(bpy.types.UIList):
         # Displays target bone
         if context.scene.target_armature:
             layout.prop_search(item, 'bone_target', bpy.context.scene.target_armature.pose, "bones", text='')
+
+class DICT_UL_BoneList(bpy.types.UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        layout = layout.split(factor=0.36, align=True)
 
 
 class ColProperty(PropertyGroup):
@@ -357,4 +368,9 @@ class ColProperty(PropertyGroup):
     FlipMeshes: BoolProperty(
     name = 'Flip Meshes',
     description = 'Flip meshes when creating the bod1_f model'
+    )
+
+    FlipBones: BoolProperty(
+    name = 'Flip Bones',
+    description = 'Flip bones when creating the bod1_f model'
     )
