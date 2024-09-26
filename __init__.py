@@ -15,8 +15,8 @@ bl_info = {
     "name" : "Hydra Tools",
     "author" : "HydraBladeZ, Dei",
     "description" : "",
-    "blender" : (3, 0, 0),
-    "version" : (1, 1, 0),
+    "blender" : (4, 2, 0),
+    "version" : (1, 1, 5),
     "location" : "View3D",
     "warning" : "",
     "category" : "Object"
