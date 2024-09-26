@@ -23,20 +23,32 @@ bl_info = {
 }
 
 import bpy
-from . Panels import (ColProperty, Panel_Main, Panel_Armature, Panel_Material, Panel_Swap, Panel_dict, Panel_misc,
-                    BoneList, DICT_UL_BoneList)
+from . Panels import (ColProperty, Panel_Main, Panel_Armature, Panel_Material, Panel_Swap,  Panel_misc,
+                     RetargetProperty,RetargetPanel #Panel_dict, BoneList, DICT_UL_BoneList,
+                     )
+
 from . Operators import (RemoveLOD, AddVertColors, RemoveVertColors,
     PaintVertexColors, ApplyRestPose, RemoveCharCode, RenameBones, AddCharCode,
     StormIK, FixNames, ArmatureModifier, Swap_Character_Code,Replace_Mats,
-    Duplicate_XFBIN_Mat, Copy_Bone_Pos, CreateClone, CreateBoneList, ExportDict,
-    RemakeShaders, Create_bod1_f, ToDmgBody,ToRegularBody)
+    Duplicate_XFBIN_Mat, Copy_Bone_Pos, CreateClone, #CreateBoneList, ExportDict,
+    RemakeShaders, Create_bod1_f, ToDmgBody,ToRegularBody, RetargetStormAnim, RetargetAllStormAnims, CloneAnmObject,
+    CorrectAnmNames)
 
-classes = (Panel_Main, Panel_Armature, Panel_Material, Panel_misc, Panel_Swap,Panel_dict,
+classes = (Panel_Main, Panel_Armature, Panel_misc, Panel_Swap,
     RemoveLOD, ColProperty, AddVertColors, RemoveVertColors,PaintVertexColors,
     ApplyRestPose, RemoveCharCode, RenameBones, AddCharCode, StormIK, FixNames,
     ArmatureModifier, Swap_Character_Code,Replace_Mats, Duplicate_XFBIN_Mat,
-    Copy_Bone_Pos, CreateClone, BoneList, CreateBoneList, DICT_UL_BoneList, ExportDict,
-    RemakeShaders, Create_bod1_f, ToDmgBody,ToRegularBody)
+    Copy_Bone_Pos, CreateClone, # Panel_dict, BoneList, CreateBoneList, DICT_UL_BoneList, ExportDict,
+    RemakeShaders, Create_bod1_f, ToDmgBody,ToRegularBody, RetargetProperty, RetargetPanel, RetargetStormAnim,
+    RetargetAllStormAnims, CloneAnmObject, CorrectAnmNames)
+
+def get_col_armatures(self, object):
+    colprop = bpy.context.scene.col_prop
+    collection = bpy.data.collections.get(colprop.collections)
+    if collection is None:
+        return []
+    else:
+        return [ob for ob in collection.objects if ob.type == 'ARMATURE']
 
 def search_armature(self, object):
     colprop = bpy.context.scene.col_prop
@@ -53,13 +65,15 @@ def target_poll(self, object):
 def register():
     for c in classes:
         bpy.utils.register_class(c)
+    bpy.types.Scene.col_armatures = bpy.props.PointerProperty(type=bpy.types.Object, poll=get_col_armatures)
     bpy.types.Scene.armaturelist = bpy.props.PointerProperty(type=bpy.types.Object, poll=search_armature)
     bpy.types.Scene.main_armature = bpy.props.PointerProperty(type=bpy.types.Object, poll=main_poll)
     bpy.types.Scene.target_armature = bpy.props.PointerProperty(type=bpy.types.Object, poll=target_poll)
     bpy.types.Scene.bone_index = bpy.props.IntProperty()
     bpy.types.Scene.col_prop = bpy.props.PointerProperty(type = ColProperty)
-    bpy.types.Scene.bone_dict_props = bpy.props.PointerProperty(type = BoneList)
-    ColProperty.bone_dict = bpy.props.CollectionProperty(type = BoneList)
+    bpy.types.Scene.retarget_prop = bpy.props.PointerProperty(type = RetargetProperty)
+    #bpy.types.Scene.bone_dict_props = bpy.props.PointerProperty(type = BoneList)
+    #ColProperty.bone_dict = bpy.props.CollectionProperty(type = BoneList)
 
 def unregister():
     for c in classes:
@@ -67,7 +81,8 @@ def unregister():
     del bpy.types.Scene.armaturelist
     del bpy.types.Scene.main_armature
     del bpy.types.Scene.target_armature
-    del bpy.types.Scene.bone_index
+    #del bpy.types.Scene.bone_index
     del bpy.types.Scene.col_prop
-    del bpy.types.Scene.bone_dict_props
-    del ColProperty.bone_dict
+    del bpy.types.Scene.retarget_prop
+    #del bpy.types.Scene.bone_dict_props
+    #del ColProperty.bone_dict

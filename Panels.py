@@ -11,7 +11,7 @@ class Panel_Main(Panel):
 
     @classmethod
     def poll(cls, context):
-        return len(bpy.data.collections) > 0
+        return context
 
     def draw(self, context):
         layout = self.layout
@@ -20,7 +20,7 @@ class Panel_Main(Panel):
 
         obj = context.object
         row = layout.row()
-        layout.prop(colprop, 'collections')
+        layout.prop_search(colprop, 'collections', bpy.data, 'collections', text= 'Collection')
         row = layout.row()
         layout.prop(colprop, 'armatures')
         row = layout.row()
@@ -134,11 +134,11 @@ class Panel_Swap(Panel):
         row = layout.row()
         row.operator("object.swap_code")
 
-        row = layout.row() 
-        col = layout.column_flow(columns=3, align=True)
-        col.operator('object.clone')
-        col.prop(colprop, 'BodID')
-        col.prop(colprop, 'CloneID')
+        #row = layout.row() 
+        #col = layout.column_flow(columns=3, align=True)
+        #col.operator('object.clone')
+        #col.prop(colprop, 'BodID')
+        #col.prop(colprop, 'CloneID')
         row = layout.row() 
         row.operator('object.dmg_bod')
         row = layout.row()
@@ -191,6 +191,7 @@ class Panel_misc(Panel):
         row = layout.row()
         row.operator("object.add_armature_modifier")
 
+'''
 class Panel_dict(Panel):
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
@@ -222,8 +223,7 @@ class Panel_dict(Panel):
         row.template_list("DICT_UL_BoneList", "BoneList", colprop, "bone_dict", scene, "bone_index", rows=1, maxrows=10)
         row = layout.row()
         row.operator('object.export_dict')
-
-
+'''
 
 class BoneList(bpy.types.PropertyGroup):
     
@@ -246,9 +246,69 @@ class DICT_UL_BoneList(bpy.types.UIList):
         if context.scene.target_armature:
             layout.prop_search(item, 'bone_target', bpy.context.scene.target_armature.pose, "bones", text='')
 
-class DICT_UL_BoneList(bpy.types.UIList):
+
+class RETARGET_UL_AnimList(bpy.types.UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
         layout = layout.split(factor=0.36, align=True)
+
+        # Displays source bone
+        layout.label(text=item.bone_main)
+
+        # Displays target bone
+        if context.scene.target_armature:
+            layout.prop_search(item, 'bone_target', bpy.context.scene.target_armature.pose, "bones", text='')
+
+
+class RetargetProperty(PropertyGroup):
+    source_armature: StringProperty(
+    name='Source Armature',
+    )
+
+    target_armature: StringProperty(
+    name='Target Armature',
+    )
+
+    anims_object: StringProperty(
+    name='Anims Object',
+    )
+
+
+
+class RetargetPanel(Panel):
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_idname = "HYDRA_PT_Panel_Retarget"
+    bl_label = "Retarget Tools"
+    bl_category = "HydraTools"
+    bl_options = {"DEFAULT_CLOSED"}
+
+    @classmethod
+    def poll(cls, context):
+        return len(bpy.data.collections) > 0
+
+    def draw(self, context):
+        layout = self.layout
+        scene = context.scene
+        colprop = bpy.context.scene.col_prop
+        reprop = bpy.context.scene.retarget_prop
+
+        obj = context.object
+        row = layout.row()
+        row.prop_search(scene, 'main_armature', bpy.data, 'objects', text= 'Source')
+        row = layout.row()
+        row.prop_search(scene, 'target_armature', bpy.data, 'objects', text= 'Target')
+        row = layout.row()
+        row.prop_search(reprop, 'anims_object', bpy.data, 'objects', text= 'Anims Object')
+
+        row = layout.row()
+        row.operator("object.retarget_storm_anim")
+        row.operator("object.retarget_all_storm_anims")
+        row = layout.row()
+        row.operator("object.clone_anm_object")
+        row = layout.row()
+        row.operator("object.correct_anm_names")
+
+
 
 
 class ColProperty(PropertyGroup):
@@ -266,26 +326,24 @@ class ColProperty(PropertyGroup):
 
     def armature_list(self, context):
         
-        collections = bpy.data.collections
         colprop = bpy.context.scene.col_prop
+
+        collection = bpy.data.collections.get(colprop.collections)
         
-        items = []
+        if collection:
+            return [(ob.name, ob.name, "") for ob in collection.objects if ob.type == 'ARMATURE']
+        else:
+            return []        
         
-        for a in collections[colprop.collections].all_objects:
-            if a.type == 'ARMATURE':
-                Name = (a.name, a.name, "")
-                items.append(Name)
-        return items
     
 
-    collections: EnumProperty(
-    items=collection_list,
+    collections: StringProperty(
     name='Collection',
     description="The collection that's going to be used for all operations")
     
     armatures: EnumProperty(
     name = 'Armature',
-    items=armature_list,
+    items = armature_list,
     description="The armature that's going to be used for armature related operations")
 
     target_armature: StringProperty(
