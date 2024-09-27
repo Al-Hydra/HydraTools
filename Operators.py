@@ -271,11 +271,15 @@ class AddCharCode(Operator):
         if ab[0].name[0:nl] == char_id and ab[0].name not in filtered_bones:
             self.report({'WARNING'}, "You need to remove the character ID first!")
 
-        for bone in [*a_object.data.bones]:
-            if any(x in bone.name for x in filtered_bones) and bone.name.split('_')[0] == '':
-                bone.name = armature.name[:4] + "_" + bone.name
-            elif any(x in bone.name for x in filtered_bones) and len(bone.name.split('_')[0]) == len(armature.name):
+        for bone in a_object.data.bones:
+            filtered_bone = [x for x in filtered_bones if x in bone.name]
+
+            if filtered_bone and bone.name.split('_')[0] == '':
+                bone.name = armature.name[:4] + bone.name
+
+            elif filtered_bone and len(bone.name.split('_')[0]) == len(armature.name):
                 bone.name = armature.name[:] + "_" + bone.name
+
             elif bone.name[0:nl] != char_id and bone.name:
                 #self.report({'INFO'}, f"ID:({char_id}) added to ({bone.name})")
                 bone.name = char_id + ' ' + bone.name
